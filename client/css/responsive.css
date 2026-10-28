@@ -1,0 +1,111 @@
+/* RouteReady Campus - Responsive Layout */
+
+@media (max-width: 1024px) {
+  .admin-layout {
+    grid-template-columns: 200px 1fr;
+  }
+
+  .route-details-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .map-container {
+    height: 380px;
+  }
+}
+
+@media (max-width: 768px) {
+  .site-nav {
+    display: none;
+    position: absolute;
+    top: 4.25rem;
+    left: 0;
+    right: 0;
+    background-color: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+    flex-direction: column;
+    padding: var(--space-4);
+    gap: var(--space-2);
+    box-shadow: var(--shadow-lg);
+  }
+
+  .site-nav.open {
+    display: flex;
+  }
+
+  .mobile-menu-btn {
+    display: block;
+  }
+
+  .admin-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-sidebar {
+    border-right: none;
+    border-bottom: 1px solid var(--color-border);
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .admin-sidebar-nav {
+    flex-direction: row;
+    overflow-x: auto;
+    padding-bottom: var(--space-2);
+  }
+
+  .admin-content {
+    padding: var(--space-4);
+  }
+
+  .hero-headline {
+    font-size: var(--font-size-2xl);
+  }
+
+  .footer-grid {
+    grid-template-columns: 1fr;
+    gap: var(--space-6);
+  }
+
+  .footer-bottom {
+    flex-direction: column;
+    gap: var(--space-3);
+    text-align: center;
+  }
+}
+
+
+/* ── New page responsive additions ── */
+
+@media (max-width: 900px) {
+  .hero-inner {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-card-stack {
+    flex-direction: row;
+    overflow-x: auto;
+  }
+
+  .hero-stat-card { min-width: 150px; }
+
+  .quick-search-fields {
+    flex-direction: column;
+  }
+
+  .quick-search-arrow { display: none; }
+
+  .home-announcements-header { flex-direction: column; align-items: flex-start; gap: var(--space-3); }
+}
+
+@media (max-width: 600px) {
+  .hero-title { font-size: var(--font-size-2xl); }
+  .hero-subtitle { font-size: var(--font-size-sm); }
+
+  .admin-sidebar-nav {
+    gap: var(--space-1);
+  }
+
+  .admin-nav-item span { display: none; }
+
+  .kpi-grid { grid-template-columns: 1fr 1fr; }
+}

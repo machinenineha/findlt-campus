@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Manage Routes & Stops — RouteReady Campus Admin</title>
+  <link rel="stylesheet" href="/css/base.css" />
+  <link rel="stylesheet" href="/css/layout.css" />
+  <link rel="stylesheet" href="/css/components.css" />
+  <link rel="stylesheet" href="/css/pages.css" />
+  <link rel="stylesheet" href="/css/responsive.css" />
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" defer></script>
+  <style>
+    .admin-page-header { background: var(--color-primary-dark); color: white; padding: var(--space-6) 0; }
+    .admin-page-header h1 { font-size: var(--font-size-xl); font-weight: 700; }
+    .admin-page-header p { font-size: var(--font-size-sm); opacity: 0.7; margin-top: 2px; }
+    .routes-tabs {
+      display: flex;
+      gap: var(--space-1);
+      background: var(--color-surface-subtle);
+      border-radius: var(--radius-md);
+      padding: 3px;
+      width: fit-content;
+      margin-bottom: var(--space-6);
+    }
+    .routes-tab {
+      padding: var(--space-2) var(--space-5);
+      border: none;
+      background: transparent;
+      border-radius: calc(var(--radius-md) - 2px);
+      font-size: var(--font-size-sm);
+      font-weight: 500;
+      color: var(--color-text-muted);
+      cursor: pointer;
+      transition: var(--transition);
+    }
+    .routes-tab.active {
+      background: var(--color-surface);
+      color: var(--color-primary);
+      font-weight: 600;
+      box-shadow: var(--shadow-sm);
+    }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+    .action-bar {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: var(--space-5); flex-wrap: wrap; gap: var(--space-3);
+    }
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.45); z-index: 999;
+      align-items: center; justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-box {
+      background: var(--color-surface); border-radius: var(--radius-xl);
+      box-shadow: var(--shadow-xl); width: 100%; max-width: 560px;
+      max-height: 90vh; overflow-y: auto; padding: var(--space-8);
+      margin: var(--space-4); position: relative;
+    }
+    .modal-title { font-size: var(--font-size-xl); font-weight: 700; margin-bottom: var(--space-5); color: var(--color-primary); }
+    .modal-close {
+      position: absolute; top: var(--space-4); right: var(--space-4);
+      background: none; border: none; cursor: pointer; color: var(--color-text-muted);
+      padding: var(--space-2); border-radius: var(--radius-md);
+    }
+    .modal-actions { display: flex; gap: var(--space-3); margin-top: var(--space-6); justify-content: flex-end; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
+    .table-actions { display: flex; gap: var(--space-2); justify-content: flex-end; }
+    .route-stops-editor {
+      border: 1px solid var(--color-border); border-radius: var(--radius-lg);
+      padding: var(--space-4); margin-top: var(--space-2);
+      max-height: 200px; overflow-y: auto;
+    }
+    .stop-check-item {
+      display: flex; align-items: center; gap: var(--space-3);
+      padding: var(--space-2) 0; border-bottom: 1px solid var(--color-border);
+      font-size: var(--font-size-sm);
+    }
+    .stop-check-item:last-child { border-bottom: none; }
+    .stop-check-item input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <header class="site-header" id="site-header"></header>
+
+  <div class="admin-page-header">
+    <div class="container">
+      <h1><i data-lucide="route" style="width:20px;height:20px;display:inline;vertical-align:text-bottom;margin-right:6px;"></i>Routes &amp; Stops</h1>
+      <p>Manage bus routes and stop locations</p>
+    </div>
+  </div>
+
+  <div class="admin-layout">
+    <!-- Sidebar -->
+    <nav class="admin-sidebar" aria-label="Admin navigation">
+      <div class="admin-sidebar-nav">
+        <a href="/admin/index.html" class="admin-nav-item"><i data-lucide="layout-dashboard" style="width:16px;height:16px;"></i> Dashboard</a>
+        <a href="/admin/buses.html" class="admin-nav-item"><i data-lucide="bus-front" style="width:16px;height:16px;"></i> Buses</a>
+        <a href="/admin/routes.html" class="admin-nav-item active"><i data-lucide="route" style="width:16px;height:16px;"></i> Routes &amp; Stops</a>
+        <a href="/admin/announcements.html" class="admin-nav-item"><i data-lucide="megaphone" style="width:16px;height:16px;"></i> Announcements</a>
+      </div>
+      <div style="margin-top:var(--space-4);">
+        <a href="/index.html" class="admin-nav-item"><i data-lucide="home" style="width:16px;height:16px;"></i> Student Portal</a>
+        <button id="admin-signout-btn" class="btn btn-outline btn-sm btn-block" style="margin-top:var(--space-4);">
+          <i data-lucide="log-out" style="width:14px;height:14px;"></i> Sign Out
+        </button>
+      </div>
+    </nav>
+
+    <!-- Content -->
+    <main class="admin-content">
+      <!-- Tab switcher -->
+      <div class="routes-tabs" role="tablist">
+        <button class="routes-tab active" data-tab="routes" role="tab">Routes</button>
+        <button class="routes-tab" data-tab="stops" role="tab">Bus Stops</button>
+      </div>
+
+      <!-- Routes Panel -->
+      <div class="tab-panel active" id="panel-routes">
+        <div class="action-bar">
+          <div>
+            <h2 style="font-size:var(--font-size-lg);font-weight:700;">Routes</h2>
+            <p class="text-muted text-sm" id="routes-count-label">Loading…</p>
+          </div>
+          <button class="btn btn-primary" id="add-route-btn">
+            <i data-lucide="plus" style="width:15px;height:15px;"></i> Add Route
+          </button>
+        </div>
+        <div style="background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-xl);overflow:hidden;">
+          <div style="overflow-x:auto;">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Route Name</th>
+                  <th>Bus</th>
+                  <th>Stops</th>
+                  <th>Status</th>
+                  <th style="text-align:right;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="routes-tbody">
+                <tr><td colspan="5" style="text-align:center;padding:var(--space-8);">
+                  <i data-lucide="loader-circle" class="spin" style="width:20px;height:20px;"></i>
+                </td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stops Panel -->
+      <div class="tab-panel" id="panel-stops">
+        <div class="action-bar">
+          <div>
+            <h2 style="font-size:var(--font-size-lg);font-weight:700;">Bus Stops</h2>
+            <p class="text-muted text-sm" id="stops-count-label">Loading…</p>
+          </div>
+          <button class="btn btn-primary" id="add-stop-btn">
+            <i data-lucide="plus" style="width:15px;height:15px;"></i> Add Stop
+          </button>
+        </div>
+        <div style="background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-xl);overflow:hidden;">
+          <div style="overflow-x:auto;">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Stop Name</th>
+                  <th>Locality / Area</th>
+                  <th>Coordinates</th>
+                  <th style="text-align:right;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="stops-tbody">
+                <tr><td colspan="4" style="text-align:center;padding:var(--space-8);">
+                  <i data-lucide="loader-circle" class="spin" style="width:20px;height:20px;"></i>
+                </td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Route Modal -->
+  <div class="modal-overlay" id="route-modal" role="dialog" aria-modal="true">
+    <div class="modal-box">
+      <button class="modal-close" id="route-modal-close"><i data-lucide="x" style="width:18px;height:18px;"></i></button>
+      <div class="modal-title" id="route-modal-title">Add New Route</div>
+      <form id="route-form" novalidate>
+        <input type="hidden" id="route-id" />
+        <div class="form-group">
+          <label class="form-label" for="route-name">Route Name <span class="required">*</span></label>
+          <input type="text" id="route-name" class="form-input" placeholder="e.g. Kengeri – College Gate Route" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="route-description">Description</label>
+          <textarea id="route-description" class="form-input" rows="2" placeholder="Brief description of this route…" style="resize:vertical;"></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="route-bus">Assigned Bus</label>
+          <select id="route-bus" class="form-input">
+            <option value="">— Select a bus —</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Assign Stops <span class="form-hint">(check all stops on this route in order)</span></label>
+          <div class="route-stops-editor" id="route-stops-checklist">
+            <p class="text-muted text-sm">Loading stops…</p>
+          </div>
+        </div>
+        <div class="form-group">
+          <div style="display:flex;align-items:center;gap:var(--space-3);">
+            <input type="checkbox" id="route-active" checked style="width:16px;height:16px;cursor:pointer;" />
+            <label for="route-active" style="cursor:pointer;font-size:var(--font-size-sm);">Active (visible to students)</label>
+          </div>
+        </div>
+        <div id="route-form-error" class="form-error" style="display:none;"></div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-outline" id="route-cancel-btn">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="route-submit-btn">Save Route</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Stop Modal -->
+  <div class="modal-overlay" id="stop-modal" role="dialog" aria-modal="true">
+    <div class="modal-box">
+      <button class="modal-close" id="stop-modal-close"><i data-lucide="x" style="width:18px;height:18px;"></i></button>
+      <div class="modal-title" id="stop-modal-title">Add New Stop</div>
+      <form id="stop-form" novalidate>
+        <input type="hidden" id="stop-id" />
+        <div class="form-group">
+          <label class="form-label" for="stop-name">Stop Name <span class="required">*</span></label>
+          <input type="text" id="stop-name" class="form-input" placeholder="e.g. Kengeri Bus Stand" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="stop-locality">Locality / Area</label>
+          <input type="text" id="stop-locality" class="form-input" placeholder="e.g. Kengeri, Bengaluru" />
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="stop-lat">Latitude</label>
+            <input type="number" id="stop-lat" class="form-input" placeholder="12.9716" step="0.0001" />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="stop-lon">Longitude</label>
+            <input type="number" id="stop-lon" class="form-input" placeholder="77.5946" step="0.0001" />
+          </div>
+        </div>
+        <p class="text-muted text-sm" style="margin-top:calc(-1 * var(--space-2));margin-bottom:var(--space-4);">
+          <i data-lucide="info" style="width:12px;height:12px;display:inline;"></i>
+          Find coordinates using <a href="https://www.openstreetmap.org" target="_blank" rel="noopener">OpenStreetMap</a> — right-click a location and copy the coordinates.
+        </p>
+        <div id="stop-form-error" class="form-error" style="display:none;"></div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-outline" id="stop-cancel-btn">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="stop-submit-btn">Save Stop</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="toast-container"></div>
+
+  <script type="module">
+    import { renderHeader } from '/js/navigation.js';
+    import { auth } from '/js/auth.js';
+    import { ApiClient } from '/js/api.js';
+    import { showToast, initIcons } from '/js/components/ui.js';
+
+    renderHeader();
+    if (!auth.requireAdmin('/dashboard.html')) { /* redirected */ }
+    document.getElementById('admin-signout-btn').addEventListener('click', () => auth.signOut());
+
+    let allRoutes = [];
+    let allStops = [];
+    let allBuses = [];
+
+    // ── Tab switching ──────────────────────────────────────────
+    document.querySelectorAll('.routes-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.routes-tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById(`panel-${tab.dataset.tab}`).classList.add('active');
+      });
+    });
+
+    // ── Data loading ───────────────────────────────────────────
+    async function loadAll() {
+      await Promise.allSettled([loadRoutes(), loadStops(), loadBuses()]);
+    }
+
+    async function loadRoutes() {
+      const tbody = document.getElementById('routes-tbody');
+      try {
+        const data = await ApiClient.getRoutes();
+        allRoutes = data?.data || [];
+        document.getElementById('routes-count-label').textContent = `${allRoutes.length} route${allRoutes.length !== 1 ? 's' : ''}`;
+        renderRoutesTable();
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="5" style="color:var(--color-danger);text-align:center;padding:var(--space-6);">${escHtml(err.message)}</td></tr>`;
+        initIcons();
+      }
+    }
+
+    async function loadStops() {
+      const tbody = document.getElementById('stops-tbody');
+      try {
+        const data = await ApiClient.getStops();
+        allStops = data?.data || [];
+        document.getElementById('stops-count-label').textContent = `${allStops.length} stop${allStops.length !== 1 ? 's' : ''}`;
+        renderStopsTable();
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="4" style="color:var(--color-danger);text-align:center;padding:var(--space-6);">${escHtml(err.message)}</td></tr>`;
+        initIcons();
+      }
+    }
+
+    async function loadBuses() {
+      try {
+        const data = await ApiClient.getBuses();
+        allBuses = data?.data || [];
+      } catch { /* non-critical */ }
+    }
+
+    // ── Render tables ──────────────────────────────────────────
+    function renderRoutesTable() {
+      const tbody = document.getElementById('routes-tbody');
+      if (!allRoutes.length) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:var(--space-8);color:var(--color-text-subtle);">No routes yet. Add your first route.</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = allRoutes.map(r => `
+        <tr>
+          <td><strong>${escHtml(r.name)}</strong></td>
+          <td>${escHtml(r.bus_number || '—')}</td>
+          <td>${r.stops?.length || 0} stops</td>
+          <td>
+            <span style="display:inline-flex;align-items:center;gap:5px;font-size:var(--font-size-xs);font-weight:600;padding:3px 10px;border-radius:var(--radius-full);background:${r.is_active !== false ? '#d1fae5' : 'var(--color-surface-subtle)'};color:${r.is_active !== false ? '#065f46' : 'var(--color-text-muted)'};">
+              ${r.is_active !== false ? 'Active' : 'Inactive'}
+            </span>
+          </td>
+          <td>
+            <div class="table-actions">
+              <button class="btn btn-outline btn-sm" data-edit-route="${r.id}">
+                <i data-lucide="pencil" style="width:13px;height:13px;"></i> Edit
+              </button>
+              <a href="/route-detail.html?id=${encodeURIComponent(r.id)}" target="_blank" class="btn btn-outline btn-sm">
+                <i data-lucide="eye" style="width:13px;height:13px;"></i>
+              </a>
+            </div>
+          </td>
+        </tr>`).join('');
+      initIcons();
+      tbody.querySelectorAll('[data-edit-route]').forEach(btn => {
+        btn.addEventListener('click', () => openEditRouteModal(btn.dataset.editRoute));
+      });
+    }
+
+    function renderStopsTable() {
+      const tbody = document.getElementById('stops-tbody');
+      if (!allStops.length) {
+        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;padding:var(--space-8);color:var(--color-text-subtle);">No stops yet.</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = allStops.map(s => `
+        <tr>
+          <td><strong>${escHtml(s.name)}</strong></td>
+          <td>${escHtml(s.locality || '—')}</td>
+          <td style="font-size:var(--font-size-xs);color:var(--color-text-subtle);">
+            ${s.latitude && s.longitude ? `${parseFloat(s.latitude).toFixed(4)}, ${parseFloat(s.longitude).toFixed(4)}` : '—'}
+          </td>
+          <td>
+            <div class="table-actions">
+              <button class="btn btn-outline btn-sm" data-edit-stop="${s.id}">
+                <i data-lucide="pencil" style="width:13px;height:13px;"></i> Edit
+              </button>
+            </div>
+          </td>
+        </tr>`).join('');
+      initIcons();
+      tbody.querySelectorAll('[data-edit-stop]').forEach(btn => {
+        btn.addEventListener('click', () => openEditStopModal(btn.dataset.editStop));
+      });
+    }
+
+    // ── Route modal ────────────────────────────────────────────
+    function openAddRouteModal() {
+      document.getElementById('route-modal-title').textContent = 'Add New Route';
+      document.getElementById('route-form').reset();
+      document.getElementById('route-id').value = '';
+      document.getElementById('route-active').checked = true;
+      document.getElementById('route-form-error').style.display = 'none';
+      populateBusSelect('');
+      populateStopsChecklist([]);
+      document.getElementById('route-modal').classList.add('open');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function openEditRouteModal(id) {
+      const route = allRoutes.find(r => String(r.id) === String(id));
+      if (!route) return;
+      document.getElementById('route-modal-title').textContent = 'Edit Route';
+      document.getElementById('route-id').value = route.id;
+      document.getElementById('route-name').value = route.name || '';
+      document.getElementById('route-description').value = route.description || '';
+      document.getElementById('route-active').checked = route.is_active !== false;
+      document.getElementById('route-form-error').style.display = 'none';
+      populateBusSelect(route.bus_id || '');
+      const checkedStopIds = (route.stops || []).map(s => String(s.id));
+      populateStopsChecklist(checkedStopIds);
+      document.getElementById('route-modal').classList.add('open');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function populateBusSelect(selectedBusId) {
+      const select = document.getElementById('route-bus');
+      select.innerHTML = '<option value="">— Select a bus —</option>' +
+        allBuses.map(b => `<option value="${b.id}" ${String(b.id) === String(selectedBusId) ? 'selected' : ''}>${escHtml(b.bus_number || b.plate_number)}</option>`).join('');
+    }
+
+    function populateStopsChecklist(checkedIds) {
+      const el = document.getElementById('route-stops-checklist');
+      if (!allStops.length) { el.innerHTML = '<p class="text-muted text-sm">No stops available. Add stops first.</p>'; return; }
+      el.innerHTML = allStops.map(s => `
+        <div class="stop-check-item">
+          <input type="checkbox" id="rs-${s.id}" name="route_stop" value="${s.id}" ${checkedIds.includes(String(s.id)) ? 'checked' : ''} />
+          <label for="rs-${s.id}" style="cursor:pointer;">${escHtml(s.name)}${s.locality ? ` <span class="text-muted" style="font-size:11px;">(${escHtml(s.locality)})</span>` : ''}</label>
+        </div>`).join('');
+    }
+
+    function closeModal(id) {
+      document.getElementById(id).classList.remove('open');
+      document.body.style.overflow = '';
+    }
+
+    // Route form submit
+    document.getElementById('route-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const errorEl = document.getElementById('route-form-error');
+      errorEl.style.display = 'none';
+      const id = document.getElementById('route-id').value;
+      const name = document.getElementById('route-name').value.trim();
+      if (!name) { errorEl.textContent = 'Route name is required.'; errorEl.style.display = ''; return; }
+
+      const checkedBoxes = document.querySelectorAll('[name="route_stop"]:checked');
+      const stopIds = Array.from(checkedBoxes).map(cb => cb.value);
+      const busId = document.getElementById('route-bus').value;
+
+      const payload = {
+        name,
+        description: document.getElementById('route-description').value.trim() || undefined,
+        bus_id: busId || undefined,
+        is_active: document.getElementById('route-active').checked
+      };
+
+      const btn = document.getElementById('route-submit-btn');
+      btn.disabled = true; btn.textContent = 'Saving…';
+      try {
+        let routeId = id;
+        if (id) {
+          await ApiClient.updateRoute(id, payload);
+        } else {
+          const res = await ApiClient.createRoute(payload);
+          routeId = res?.data?.id;
+        }
+        if (routeId && stopIds.length) {
+          await ApiClient.setRouteStops(routeId, stopIds).catch(() => {});
+        }
+        showToast(id ? 'Route updated.' : 'Route created.', 'success');
+        closeModal('route-modal');
+        await loadRoutes();
+      } catch (err) {
+        errorEl.textContent = err.message || 'Could not save route.';
+        errorEl.style.display = '';
+      } finally {
+        btn.disabled = false; btn.textContent = 'Save Route';
+      }
+    });
+
+    // ── Stop modal ─────────────────────────────────────────────
+    function openAddStopModal() {
+      document.getElementById('stop-modal-title').textContent = 'Add New Stop';
+      document.getElementById('stop-form').reset();
+      document.getElementById('stop-id').value = '';
+      document.getElementById('stop-form-error').style.display = 'none';
+      document.getElementById('stop-modal').classList.add('open');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function openEditStopModal(id) {
+      const stop = allStops.find(s => String(s.id) === String(id));
+      if (!stop) return;
+      document.getElementById('stop-modal-title').textContent = 'Edit Stop';
+      document.getElementById('stop-id').value = stop.id;
+      document.getElementById('stop-name').value = stop.name || '';
+      document.getElementById('stop-locality').value = stop.locality || '';
+      document.getElementById('stop-lat').value = stop.latitude || '';
+      document.getElementById('stop-lon').value = stop.longitude || '';
+      document.getElementById('stop-form-error').style.display = 'none';
+      document.getElementById('stop-modal').classList.add('open');
+      document.body.style.overflow = 'hidden';
+    }
+
+    // Stop form submit
+    document.getElementById('stop-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const errorEl = document.getElementById('stop-form-error');
+      errorEl.style.display = 'none';
+      const id = document.getElementById('stop-id').value;
+      const name = document.getElementById('stop-name').value.trim();
+      if (!name) { errorEl.textContent = 'Stop name is required.'; errorEl.style.display = ''; return; }
+
+      const payload = {
+        name,
+        locality: document.getElementById('stop-locality').value.trim() || undefined,
+        latitude: parseFloat(document.getElementById('stop-lat').value) || undefined,
+        longitude: parseFloat(document.getElementById('stop-lon').value) || undefined
+      };
+
+      const btn = document.getElementById('stop-submit-btn');
+      btn.disabled = true; btn.textContent = 'Saving…';
+      try {
+        if (id) { await ApiClient.updateStop(id, payload); }
+        else { await ApiClient.createStop(payload); }
+        showToast(id ? 'Stop updated.' : 'Stop added.', 'success');
+        closeModal('stop-modal');
+        await loadStops();
+      } catch (err) {
+        errorEl.textContent = err.message || 'Could not save stop.';
+        errorEl.style.display = '';
+      } finally {
+        btn.disabled = false; btn.textContent = 'Save Stop';
+      }
+    });
+
+    // Wire up buttons
+    document.getElementById('add-route-btn').addEventListener('click', openAddRouteModal);
+    document.getElementById('add-stop-btn').addEventListener('click', openAddStopModal);
+    document.getElementById('route-modal-close').addEventListener('click', () => closeModal('route-modal'));
+    document.getElementById('route-cancel-btn').addEventListener('click', () => closeModal('route-modal'));
+    document.getElementById('stop-modal-close').addEventListener('click', () => closeModal('stop-modal'));
+    document.getElementById('stop-cancel-btn').addEventListener('click', () => closeModal('stop-modal'));
+    document.getElementById('route-modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeModal('route-modal'); });
+    document.getElementById('stop-modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeModal('stop-modal'); });
+
+    function escHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    loadAll();
+    initIcons();
+  </script>
+</body>
+</html>
+

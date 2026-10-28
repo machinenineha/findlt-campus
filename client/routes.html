@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bus Routes — RouteReady Campus</title>
+  <meta name="description" content="View all campus bus routes and their stops on an interactive map." />
+  <link rel="stylesheet" href="/css/base.css" />
+  <link rel="stylesheet" href="/css/layout.css" />
+  <link rel="stylesheet" href="/css/components.css" />
+  <link rel="stylesheet" href="/css/pages.css" />
+  <link rel="stylesheet" href="/css/responsive.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" defer></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
+  <style>
+    .routes-page-header {
+      background: var(--color-primary);
+      color: white;
+      padding: var(--space-10) 0 var(--space-8);
+    }
+    .routes-page-header h1 { font-size: var(--font-size-3xl); font-weight: 800; margin-bottom: var(--space-2); }
+    .routes-page-header p { opacity: 0.85; font-size: var(--font-size-base); }
+    .routes-content {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      min-height: 70vh;
+      gap: 0;
+    }
+    .routes-list-panel {
+      border-right: 1px solid var(--color-border);
+      background: var(--color-surface);
+      overflow-y: auto;
+      max-height: 75vh;
+    }
+    .route-list-item {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--space-4);
+      padding: var(--space-5) var(--space-6);
+      border-bottom: 1px solid var(--color-border);
+      cursor: pointer;
+      transition: var(--transition);
+    }
+    .route-list-item:hover, .route-list-item.active {
+      background: var(--color-primary-soft);
+    }
+    .route-list-item.active { border-left: 3px solid var(--color-primary); }
+    .route-color-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      margin-top: 4px;
+    }
+    .route-item-name { font-weight: 600; color: var(--color-text-main); font-size: var(--font-size-sm); }
+    .route-item-meta { font-size: var(--font-size-xs); color: var(--color-text-muted); margin-top: 2px; }
+    .routes-map-panel { position: relative; }
+    #routes-map { width: 100%; height: 75vh; }
+    .route-detail-overlay {
+      position: absolute;
+      top: var(--space-4);
+      right: var(--space-4);
+      width: 280px;
+      background: white;
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-lg);
+      padding: var(--space-5);
+      z-index: 400;
+      max-height: 60vh;
+      overflow-y: auto;
+    }
+    .route-detail-overlay.hidden { display: none; }
+    .route-overlay-name { font-weight: 700; font-size: var(--font-size-base); color: var(--color-primary); margin-bottom: var(--space-3); }
+    .route-cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: var(--space-4);
+      padding: var(--space-8) 0;
+    }
+    .route-summary-card {
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      padding: var(--space-5);
+      background: var(--color-surface);
+      transition: var(--transition);
+    }
+    .route-summary-card:hover {
+      box-shadow: var(--shadow-md);
+      border-color: var(--color-primary);
+    }
+    .route-card-header { display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-3); }
+    .route-card-name { font-weight: 700; font-size: var(--font-size-base); }
+    .route-card-meta { font-size: var(--font-size-xs); color: var(--color-text-muted); }
+    .route-stops-count { display: flex; align-items: center; gap: var(--space-1); font-size: var(--font-size-sm); color: var(--color-text-muted); margin-bottom: var(--space-4); }
+    .stop-mini-list { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+    .stop-mini-badge {
+      font-size: 11px;
+      background: var(--color-surface-subtle);
+      border: 1px solid var(--color-border);
+      color: var(--color-text-muted);
+      padding: 2px 8px;
+      border-radius: var(--radius-full);
+    }
+    @media (max-width: 900px) {
+      .routes-content { grid-template-columns: 1fr; }
+      .routes-list-panel { max-height: 300px; }
+      #routes-map { height: 320px; }
+      .route-detail-overlay { width: calc(100% - 2rem); right: 1rem; }
+    }
+  </style>
+</head>
+<body>
+  <header class="site-header" id="site-header"></header>
+
+  <div class="routes-page-header">
+    <div class="container">
+      <h1>Bus Routes</h1>
+      <p>All scheduled campus bus routes. Select a route to view stops on the map.</p>
+    </div>
+  </div>
+
+  <div class="container" style="padding-bottom: var(--space-12);">
+    <!-- Map + List Layout -->
+    <div class="routes-content" style="margin-top:var(--space-6);border:1px solid var(--color-border);border-radius:var(--radius-xl);overflow:hidden;">
+      <aside class="routes-list-panel" id="routes-list-panel">
+        <div class="loading-state" style="padding:var(--space-8);text-align:center;">
+          <i data-lucide="loader-circle" class="spin" style="width:22px;height:22px;"></i>
+          <div style="margin-top:var(--space-2);font-size:var(--font-size-sm);color:var(--color-text-muted);">Loading routes…</div>
+        </div>
+      </aside>
+
+      <main class="routes-map-panel">
+        <div id="routes-map"></div>
+        <div class="route-detail-overlay hidden" id="route-overlay">
+          <button id="close-overlay-btn" style="position:absolute;top:var(--space-3);right:var(--space-3);background:none;border:none;cursor:pointer;color:var(--color-text-muted);">
+            <i data-lucide="x" style="width:16px;height:16px;"></i>
+          </button>
+          <div id="overlay-content"></div>
+        </div>
+      </main>
+    </div>
+
+    <!-- Route Cards Grid -->
+    <div id="route-cards-section">
+      <div class="section-header" style="margin-top:var(--space-10);">
+        <h2 class="section-title">All Routes Overview</h2>
+        <p class="section-subtitle">Tap any route card to see more details and open the full route view.</p>
+      </div>
+      <div class="route-cards-grid" id="route-cards-grid">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+  </div>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-bottom">
+        <span>&copy; 2024 Apex Institute of Technology</span>
+        <span>Scheduled timings only. Not a live tracking service.</span>
+      </div>
+    </div>
+  </footer>
+
+  <div id="toast-container"></div>
+
+  <script type="module">
+    import { renderHeader } from '/js/navigation.js';
+    import { ApiClient } from '/js/api.js';
+    import { CampusMap } from '/js/map.js';
+    import { showToast, initIcons } from '/js/components/ui.js';
+
+    renderHeader();
+
+    const ROUTE_COLORS = ['#1e3a8a', '#0d9488', '#d97706', '#db2777', '#7c3aed', '#dc2626'];
+    const campusMap = new CampusMap('routes-map', { zoom: 11 });
+    campusMap.init();
+
+    let allRoutes = [];
+    let activeRouteIndex = null;
+
+    async function loadRoutes() {
+      try {
+        const data = await ApiClient.getRoutes();
+        allRoutes = data?.data || [];
+        renderRouteList();
+        renderRouteCards();
+        if (allRoutes.length > 0) selectRoute(0);
+      } catch (err) {
+        document.getElementById('routes-list-panel').innerHTML =
+          `<div class="empty-state" style="padding:var(--space-8);"><p style="color:var(--color-danger);">Could not load routes. ${escHtml(err.message)}</p></div>`;
+        initIcons();
+      }
+    }
+
+    function renderRouteList() {
+      const panel = document.getElementById('routes-list-panel');
+      if (allRoutes.length === 0) {
+        panel.innerHTML = `<div class="empty-state" style="padding:var(--space-8);text-align:center;"><p>No routes available.</p></div>`;
+        initIcons();
+        return;
+      }
+      panel.innerHTML = allRoutes.map((r, i) => `
+        <div class="route-list-item ${i === 0 ? 'active' : ''}" data-index="${i}" role="button" tabindex="0" aria-label="Route ${escHtml(r.name)}">
+          <div class="route-color-dot" style="background:${ROUTE_COLORS[i % ROUTE_COLORS.length]};"></div>
+          <div>
+            <div class="route-item-name">${escHtml(r.name)}</div>
+            <div class="route-item-meta">
+              ${r.stops?.length ? `${r.stops.length} stops` : ''}
+              ${r.bus_number ? ` · Bus ${escHtml(r.bus_number)}` : ''}
+            </div>
+          </div>
+        </div>`).join('');
+      initIcons();
+
+      panel.querySelectorAll('.route-list-item').forEach((item, i) => {
+        item.addEventListener('click', () => selectRoute(i));
+        item.addEventListener('keypress', e => { if (e.key === 'Enter') selectRoute(i); });
+      });
+    }
+
+    function selectRoute(index) {
+      activeRouteIndex = index;
+      const route = allRoutes[index];
+
+      // Update active state in list
+      document.querySelectorAll('.route-list-item').forEach((el, i) => {
+        el.classList.toggle('active', i === index);
+      });
+
+      // Render stops on map
+      const stops = route.stops || [];
+      campusMap.renderRouteStops(stops);
+
+      // Show overlay
+      const overlay = document.getElementById('route-overlay');
+      const content = document.getElementById('overlay-content');
+      overlay.classList.remove('hidden');
+      content.innerHTML = `
+        <div class="route-overlay-name">${escHtml(route.name)}</div>
+        ${route.description ? `<p style="font-size:var(--font-size-xs);color:var(--color-text-muted);margin-bottom:var(--space-3);">${escHtml(route.description)}</p>` : ''}
+        <div style="font-size:var(--font-size-xs);color:var(--color-text-subtle);margin-bottom:var(--space-2);">STOPS (${stops.length})</div>
+        ${stops.map((s, si) => `
+          <div style="display:flex;align-items:center;gap:var(--space-2);padding:var(--space-1) 0;border-bottom:1px solid var(--color-border);">
+            <span style="width:18px;height:18px;background:${ROUTE_COLORS[index % ROUTE_COLORS.length]};color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0;">${si + 1}</span>
+            <span style="font-size:var(--font-size-xs);color:var(--color-text-main);">${escHtml(s.name)}</span>
+          </div>`).join('')}
+        <div style="margin-top:var(--space-4);">
+          <a href="/route-detail.html?id=${encodeURIComponent(route.id)}" class="btn btn-primary btn-sm" style="width:100%;">
+            <i data-lucide="external-link" style="width:13px;height:13px;"></i>
+            Full Route Details
+          </a>
+        </div>`;
+      initIcons();
+    }
+
+    function renderRouteCards() {
+      const grid = document.getElementById('route-cards-grid');
+      if (allRoutes.length === 0) {
+        grid.innerHTML = '<p style="color:var(--color-text-muted);">No routes to display.</p>';
+        return;
+      }
+      grid.innerHTML = allRoutes.map((r, i) => `
+        <div class="route-summary-card">
+          <div class="route-card-header">
+            <div class="route-color-dot" style="background:${ROUTE_COLORS[i % ROUTE_COLORS.length]};width:16px;height:16px;border-radius:4px;"></div>
+            <div>
+              <div class="route-card-name">${escHtml(r.name)}</div>
+              ${r.bus_number ? `<div class="route-card-meta">Bus ${escHtml(r.bus_number)}</div>` : ''}
+            </div>
+          </div>
+          ${r.stops?.length ? `
+            <div class="route-stops-count">
+              <i data-lucide="map-pin" style="width:13px;height:13px;"></i>
+              ${r.stops.length} stops
+            </div>
+            <div class="stop-mini-list">
+              ${r.stops.slice(0, 5).map(s => `<span class="stop-mini-badge">${escHtml(s.name)}</span>`).join('')}
+              ${r.stops.length > 5 ? `<span class="stop-mini-badge">+${r.stops.length - 5} more</span>` : ''}
+            </div>` : ''}
+          <div style="margin-top:var(--space-4);display:flex;gap:var(--space-2);">
+            <button class="btn btn-outline btn-sm" onclick="document.querySelectorAll('.route-list-item')[${i}]?.click();window.scrollTo({top:0,behavior:'smooth'});">
+              View on Map
+            </button>
+            <a href="/route-detail.html?id=${encodeURIComponent(r.id)}" class="btn btn-primary btn-sm">Route Details</a>
+          </div>
+        </div>`).join('');
+      initIcons();
+    }
+
+    // Close overlay
+    document.getElementById('close-overlay-btn').addEventListener('click', () => {
+      document.getElementById('route-overlay').classList.add('hidden');
+    });
+
+    function escHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    loadRoutes();
+  </script>
+</body>
+</html>
+

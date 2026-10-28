@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RouteReady Campus — College Bus Transport Portal</title>
+  <meta name="description" content="Find your campus bus route, check timetables, and stay updated with transport announcements at Apex Institute of Technology." />
+  <link rel="stylesheet" href="/css/base.css" />
+  <link rel="stylesheet" href="/css/layout.css" />
+  <link rel="stylesheet" href="/css/components.css" />
+  <link rel="stylesheet" href="/css/pages.css" />
+  <link rel="stylesheet" href="/css/responsive.css" />
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" defer></script>
+</head>
+<body>
+  <!-- Header (rendered by navigation.js) -->
+  <header class="site-header" id="site-header"></header>
+
+  <main class="main-content">
+
+    <!-- Hero Section -->
+    <section class="hero-section">
+      <div class="hero-bg-pattern"></div>
+      <div class="container hero-inner">
+        <div class="hero-text">
+          <div class="hero-badge">
+            <i data-lucide="shield-check" style="width:14px;height:14px;"></i>
+            Apex Institute of Technology — Official Transport Portal
+          </div>
+          <h1 class="hero-title">
+            Know Your Route.<br />
+            <span class="hero-title-accent">Catch Your Bus.</span>
+          </h1>
+          <p class="hero-subtitle">
+            Search bus routes, find the nearest stop, check morning and evening
+            schedules, and read the latest transport announcements — all in one place.
+          </p>
+          <div class="hero-actions">
+            <a href="/find-bus.html" class="btn btn-primary btn-lg">
+              <i data-lucide="search" style="width:18px;height:18px;"></i>
+              Find Your Bus
+            </a>
+            <a href="/routes.html" class="btn btn-outline btn-lg">
+              <i data-lucide="map" style="width:18px;height:18px;"></i>
+              View All Routes
+            </a>
+          </div>
+        </div>
+        <div class="hero-visual" aria-hidden="true">
+          <div class="hero-card-stack">
+            <div class="hero-stat-card">
+              <i data-lucide="bus-front" style="width:28px;height:28px;color:var(--color-primary);"></i>
+              <div>
+                <div class="hero-stat-number" id="stat-buses">6</div>
+                <div class="hero-stat-label">Active Buses</div>
+              </div>
+            </div>
+            <div class="hero-stat-card">
+              <i data-lucide="route" style="width:28px;height:28px;color:var(--color-accent);"></i>
+              <div>
+                <div class="hero-stat-number" id="stat-routes">4</div>
+                <div class="hero-stat-label">Scheduled Routes</div>
+              </div>
+            </div>
+            <div class="hero-stat-card">
+              <i data-lucide="map-pin" style="width:28px;height:28px;color:var(--color-primary-light);"></i>
+              <div>
+                <div class="hero-stat-number" id="stat-stops">15</div>
+                <div class="hero-stat-label">Bus Stops</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Quick Search Bar -->
+    <section class="quick-search-section">
+      <div class="container">
+        <div class="quick-search-card">
+          <h2 class="quick-search-title">Quick Route Search</h2>
+          <form class="quick-search-form" id="quick-search-form" role="search">
+            <div class="quick-search-fields">
+              <div class="form-group">
+                <label for="qs-origin" class="form-label">
+                  <i data-lucide="map-pin" style="width:14px;height:14px;color:var(--color-accent);"></i>
+                  From (Origin Stop)
+                </label>
+                <input type="text" id="qs-origin" class="form-input" placeholder="e.g. Kengeri, Rajajinagar…" autocomplete="off" />
+              </div>
+              <div class="quick-search-arrow" aria-hidden="true">
+                <i data-lucide="arrow-right" style="width:20px;height:20px;color:var(--color-text-subtle);"></i>
+              </div>
+              <div class="form-group">
+                <label for="qs-destination" class="form-label">
+                  <i data-lucide="flag" style="width:14px;height:14px;color:var(--color-primary);"></i>
+                  To (Destination)
+                </label>
+                <input type="text" id="qs-destination" class="form-input" placeholder="e.g. College Gate, Campus…" autocomplete="off" />
+              </div>
+              <button type="submit" class="btn btn-primary">
+                <i data-lucide="search" style="width:16px;height:16px;"></i>
+                Search
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features-section">
+      <div class="container">
+        <div class="section-header">
+          <h2 class="section-title">Everything You Need for Campus Transport</h2>
+          <p class="section-subtitle">A single portal for students and transport administrators at Apex Institute of Technology.</p>
+        </div>
+        <div class="features-grid">
+          <div class="feature-card">
+            <div class="feature-icon-wrap" style="background:var(--color-primary-soft);">
+              <i data-lucide="search" style="width:24px;height:24px;color:var(--color-primary);"></i>
+            </div>
+            <h3>Route Search</h3>
+            <p>Enter your pickup area and the system finds which bus and route serves your location.</p>
+            <a href="/find-bus.html" class="feature-link">Search routes <i data-lucide="arrow-right" style="width:14px;height:14px;"></i></a>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon-wrap" style="background:var(--color-accent-soft);">
+              <i data-lucide="map" style="width:24px;height:24px;color:var(--color-accent);"></i>
+            </div>
+            <h3>Interactive Maps</h3>
+            <p>View every route on an interactive map with all stops marked, powered by OpenStreetMap.</p>
+            <a href="/routes.html" class="feature-link">View routes <i data-lucide="arrow-right" style="width:14px;height:14px;"></i></a>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon-wrap" style="background:#fef3c7;">
+              <i data-lucide="clock" style="width:24px;height:24px;color:#d97706;"></i>
+            </div>
+            <h3>Timetables</h3>
+            <p>Check morning and evening scheduled departure and arrival times for every route and stop.</p>
+            <a href="/timetables.html" class="feature-link">View timetables <i data-lucide="arrow-right" style="width:14px;height:14px;"></i></a>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon-wrap" style="background:#fce7f3;">
+              <i data-lucide="megaphone" style="width:24px;height:24px;color:#db2777;"></i>
+            </div>
+            <h3>Announcements</h3>
+            <p>Stay informed about route changes, delays, holidays, and important transport notices.</p>
+            <a href="/announcements.html" class="feature-link">Read announcements <i data-lucide="arrow-right" style="width:14px;height:14px;"></i></a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Latest Announcements Strip -->
+    <section class="home-announcements-section">
+      <div class="container">
+        <div class="home-announcements-header">
+          <h2 class="section-title">Latest Transport Notices</h2>
+          <a href="/announcements.html" class="btn btn-outline btn-sm">All Notices</a>
+        </div>
+        <div id="home-announcements-list" class="home-announcements-list">
+          <div class="loading-state">
+            <i data-lucide="loader-circle" class="spin" style="width:20px;height:20px;"></i>
+            Loading notices…
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Demo Data Notice Banner -->
+    <section class="notice-banner-section">
+      <div class="container">
+        <div class="notice-banner notice-banner-info">
+          <i data-lucide="info" style="width:18px;height:18px;flex-shrink:0;"></i>
+          <div>
+            <strong>Demonstration Data Active</strong> — This portal is currently populated with sample routes,
+            stops, schedules, and announcements for evaluation purposes. Transport administrators can sign in
+            to the <a href="/admin/index.html">Admin Dashboard</a> to manage real data.
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-col">
+          <h4>RouteReady Campus</h4>
+          <p style="color:#94a3b8;line-height:1.7;max-width:280px;">
+            The official college bus transport portal for Apex Institute of Technology.
+            Scheduled timings only — no live tracking.
+          </p>
+        </div>
+        <div class="footer-col">
+          <h4>Navigate</h4>
+          <ul>
+            <li><a href="/find-bus.html">Find Your Bus</a></li>
+            <li><a href="/routes.html">Route Map</a></li>
+            <li><a href="/timetables.html">Timetables</a></li>
+            <li><a href="/announcements.html">Announcements</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Account</h4>
+          <ul>
+            <li><a href="/login.html">Sign In / Sign Up</a></li>
+            <li><a href="/dashboard.html">My Profile</a></li>
+            <li><a href="/admin/index.html">Admin Dashboard</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Transport Office</h4>
+          <ul>
+            <li><i data-lucide="phone" style="width:13px;height:13px;display:inline;"></i> +91 80 2345 6789</li>
+            <li><i data-lucide="mail" style="width:13px;height:13px;display:inline;"></i> transport@apex.edu.in</li>
+            <li><i data-lucide="clock" style="width:13px;height:13px;display:inline;"></i> Mon–Fri, 8 AM – 5 PM</li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>&copy; 2024 Apex Institute of Technology. All rights reserved.</span>
+        <span>Scheduled timings only. Not a live tracking service.</span>
+      </div>
+    </div>
+  </footer>
+
+  <div id="toast-container"></div>
+
+  <script type="module">
+    import { renderHeader } from '/js/navigation.js';
+    import { ApiClient } from '/js/api.js';
+    import { initIcons } from '/js/components/ui.js';
+
+    renderHeader();
+
+    // Quick search redirect
+    const form = document.getElementById('quick-search-form');
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const origin = document.getElementById('qs-origin').value.trim();
+      const dest = document.getElementById('qs-destination').value.trim();
+      if (!origin && !dest) return;
+      const params = new URLSearchParams();
+      if (origin) params.set('origin', origin);
+      if (dest) params.set('destination', dest);
+      window.location.href = `/find-bus.html?${params.toString()}`;
+    });
+
+    // Load announcements preview
+    async function loadAnnouncements() {
+      const listEl = document.getElementById('home-announcements-list');
+      try {
+        const data = await ApiClient.getAnnouncements();
+        const items = (data?.data || []).slice(0, 3);
+        if (items.length === 0) {
+          listEl.innerHTML = '<div class="empty-state"><p>No announcements at this time.</p></div>';
+          return;
+        }
+        listEl.innerHTML = items.map(a => `
+          <div class="announcement-strip-item priority-${a.priority || 'normal'}">
+            <div class="announcement-strip-meta">
+              <span class="badge badge-${a.priority === 'urgent' ? 'danger' : a.priority === 'high' ? 'warning' : 'info'}">${a.priority || 'info'}</span>
+              <span class="text-muted text-sm">${formatDate(a.created_at)}</span>
+            </div>
+            <div class="announcement-strip-title">${escHtml(a.title)}</div>
+            <div class="announcement-strip-body text-muted">${escHtml(a.body?.substring(0, 120) || '')}${(a.body?.length || 0) > 120 ? '…' : ''}</div>
+          </div>
+        `).join('');
+      } catch {
+        listEl.innerHTML = '<div class="empty-state"><p>Could not load announcements.</p></div>';
+      }
+      initIcons();
+    }
+
+    // Load dashboard stats
+    async function loadStats() {
+      try {
+        const [buses, routes, stops] = await Promise.allSettled([
+          ApiClient.getBuses(),
+          ApiClient.getRoutes(),
+          ApiClient.getStops()
+        ]);
+        if (buses.status === 'fulfilled') {
+          const count = buses.value?.data?.length || buses.value?.count || 6;
+          document.getElementById('stat-buses').textContent = count;
+        }
+        if (routes.status === 'fulfilled') {
+          const count = routes.value?.data?.length || routes.value?.count || 4;
+          document.getElementById('stat-routes').textContent = count;
+        }
+        if (stops.status === 'fulfilled') {
+          const count = stops.value?.data?.length || stops.value?.count || 15;
+          document.getElementById('stat-stops').textContent = count;
+        }
+      } catch { /* Use defaults */ }
+    }
+
+    function formatDate(iso) {
+      if (!iso) return '';
+      return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+    }
+
+    function escHtml(str) {
+      if (!str) return '';
+      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    loadAnnouncements();
+    loadStats();
+  </script>
+</body>
+</html>
+

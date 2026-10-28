@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>My Dashboard — RouteReady Campus</title>
+  <meta name="description" content="Your RouteReady Campus student profile and saved routes." />
+  <link rel="stylesheet" href="/css/base.css" />
+  <link rel="stylesheet" href="/css/layout.css" />
+  <link rel="stylesheet" href="/css/components.css" />
+  <link rel="stylesheet" href="/css/pages.css" />
+  <link rel="stylesheet" href="/css/responsive.css" />
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" defer></script>
+  <style>
+    .dashboard-page-header {
+      background: var(--color-primary);
+      color: white;
+      padding: var(--space-8) 0;
+    }
+    .dashboard-page-header h1 { font-size: var(--font-size-2xl); font-weight: 800; }
+    .dashboard-page-header p { opacity: 0.8; font-size: var(--font-size-sm); margin-top: var(--space-1); }
+    .dashboard-layout {
+      display: grid;
+      grid-template-columns: 300px 1fr;
+      gap: var(--space-8);
+      padding: var(--space-8) 0 var(--space-12);
+      align-items: start;
+    }
+    .profile-card {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-xl);
+      overflow: hidden;
+    }
+    .profile-card-header {
+      background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-light) 100%);
+      padding: var(--space-8) var(--space-5) var(--space-6);
+      text-align: center;
+      color: white;
+    }
+    .profile-avatar {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.25);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+      font-weight: 700;
+      margin: 0 auto var(--space-3);
+      border: 3px solid rgba(255,255,255,0.5);
+    }
+    .profile-name { font-size: var(--font-size-lg); font-weight: 700; }
+    .profile-email { font-size: var(--font-size-sm); opacity: 0.8; margin-top: 2px; }
+    .profile-role-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-1);
+      background: rgba(255,255,255,0.2);
+      padding: 3px 10px;
+      border-radius: var(--radius-full);
+      font-size: var(--font-size-xs);
+      font-weight: 600;
+      margin-top: var(--space-2);
+    }
+    .profile-card-body { padding: var(--space-5); }
+    .profile-nav-link {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      padding: var(--space-3) var(--space-3);
+      border-radius: var(--radius-md);
+      font-size: var(--font-size-sm);
+      color: var(--color-text-muted);
+      transition: var(--transition);
+      cursor: pointer;
+    }
+    .profile-nav-link:hover, .profile-nav-link.active {
+      background: var(--color-primary-soft);
+      color: var(--color-primary);
+    }
+    .profile-signout-btn {
+      width: 100%;
+      margin-top: var(--space-4);
+      border-top: 1px solid var(--color-border);
+      padding-top: var(--space-4);
+    }
+    .dashboard-section {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-xl);
+      padding: var(--space-6);
+      margin-bottom: var(--space-5);
+    }
+    .dashboard-section h2 {
+      font-size: var(--font-size-lg);
+      font-weight: 700;
+      color: var(--color-primary);
+      margin-bottom: var(--space-5);
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+    }
+    .profile-form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-4);
+    }
+    .quick-links-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: var(--space-3);
+    }
+    .quick-link-tile {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-2);
+      padding: var(--space-5);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      text-align: center;
+      color: var(--color-text-muted);
+      font-size: var(--font-size-sm);
+      font-weight: 500;
+      transition: var(--transition);
+    }
+    .quick-link-tile:hover {
+      border-color: var(--color-primary);
+      background: var(--color-primary-soft);
+      color: var(--color-primary);
+    }
+    .quick-link-tile i { color: var(--color-primary); }
+    @media (max-width: 900px) {
+      .dashboard-layout { grid-template-columns: 1fr; }
+      .profile-form-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header class="site-header" id="site-header"></header>
+
+  <div class="dashboard-page-header">
+    <div class="container">
+      <h1 id="page-greeting">My Dashboard</h1>
+      <p>Manage your profile and access transport services</p>
+    </div>
+  </div>
+
+  <main class="container">
+    <div class="dashboard-layout">
+
+      <!-- Profile Sidebar -->
+      <aside>
+        <div class="profile-card">
+          <div class="profile-card-header">
+            <div class="profile-avatar" id="avatar-initial">?</div>
+            <div class="profile-name" id="profile-display-name">Loading…</div>
+            <div class="profile-email" id="profile-email"></div>
+            <div class="profile-role-badge" id="profile-role-badge">
+              <i data-lucide="user" style="width:12px;height:12px;"></i>
+              <span id="profile-role-label">Student</span>
+            </div>
+          </div>
+          <div class="profile-card-body">
+            <a href="/find-bus.html" class="profile-nav-link">
+              <i data-lucide="search" style="width:16px;height:16px;"></i> Find My Bus
+            </a>
+            <a href="/routes.html" class="profile-nav-link">
+              <i data-lucide="map" style="width:16px;height:16px;"></i> Route Map
+            </a>
+            <a href="/timetables.html" class="profile-nav-link">
+              <i data-lucide="clock" style="width:16px;height:16px;"></i> Timetables
+            </a>
+            <a href="/announcements.html" class="profile-nav-link">
+              <i data-lucide="megaphone" style="width:16px;height:16px;"></i> Announcements
+            </a>
+            <div id="admin-nav-link" style="display:none;">
+              <a href="/admin/index.html" class="profile-nav-link" style="color:var(--color-accent);font-weight:600;">
+                <i data-lucide="shield" style="width:16px;height:16px;"></i> Admin Dashboard
+              </a>
+            </div>
+            <div class="profile-signout-btn">
+              <button class="btn btn-outline btn-sm btn-block" id="signout-btn">
+                <i data-lucide="log-out" style="width:14px;height:14px;"></i>
+                Sign Out
+              </button>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Main Content -->
+      <div>
+
+        <!-- Quick Links -->
+        <div class="dashboard-section">
+          <h2>
+            <i data-lucide="zap" style="width:18px;height:18px;"></i>
+            Quick Access
+          </h2>
+          <div class="quick-links-grid">
+            <a href="/find-bus.html" class="quick-link-tile">
+              <i data-lucide="search" style="width:28px;height:28px;"></i>
+              Find Your Bus
+            </a>
+            <a href="/routes.html" class="quick-link-tile">
+              <i data-lucide="map" style="width:28px;height:28px;"></i>
+              Route Map
+            </a>
+            <a href="/timetables.html" class="quick-link-tile">
+              <i data-lucide="clock" style="width:28px;height:28px;"></i>
+              Timetables
+            </a>
+            <a href="/announcements.html" class="quick-link-tile">
+              <i data-lucide="bell" style="width:28px;height:28px;"></i>
+              Announcements
+            </a>
+          </div>
+        </div>
+
+        <!-- Edit Profile -->
+        <div class="dashboard-section">
+          <h2>
+            <i data-lucide="user-cog" style="width:18px;height:18px;"></i>
+            Edit Profile
+          </h2>
+          <form id="profile-form" novalidate>
+            <div class="profile-form-grid">
+              <div class="form-group">
+                <label class="form-label" for="edit-name">Full Name</label>
+                <input type="text" id="edit-name" class="form-input" placeholder="Your full name" />
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="edit-phone">Phone Number <span class="form-hint">(optional)</span></label>
+                <input type="tel" id="edit-phone" class="form-input" placeholder="+91 98765 43210" />
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="edit-email">Email Address <span class="form-hint">(cannot be changed here)</span></label>
+              <input type="email" id="edit-email" class="form-input" disabled style="background:var(--color-surface-subtle);" />
+            </div>
+            <div id="profile-save-error" class="form-error" style="display:none;"></div>
+            <div id="profile-save-success" class="form-success" style="display:none;"></div>
+            <button type="submit" class="btn btn-primary" id="save-profile-btn">
+              <i data-lucide="save" style="width:15px;height:15px;"></i>
+              Save Changes
+            </button>
+          </form>
+        </div>
+
+        <!-- Latest Announcements -->
+        <div class="dashboard-section">
+          <h2>
+            <i data-lucide="bell" style="width:18px;height:18px;"></i>
+            Recent Announcements
+          </h2>
+          <div id="dash-announcements">
+            <div class="loading-state">
+              <i data-lucide="loader-circle" class="spin" style="width:18px;height:18px;"></i>
+              Loading…
+            </div>
+          </div>
+          <div style="margin-top:var(--space-4);">
+            <a href="/announcements.html" class="btn btn-outline btn-sm">View All Announcements</a>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-bottom">
+        <span>&copy; 2024 Apex Institute of Technology</span>
+        <span>Scheduled timings only.</span>
+      </div>
+    </div>
+  </footer>
+
+  <div id="toast-container"></div>
+
+  <script type="module">
+    import { renderHeader } from '/js/navigation.js';
+    import { auth } from '/js/auth.js';
+    import { ApiClient } from '/js/api.js';
+    import { showToast, initIcons } from '/js/components/ui.js';
+
+    renderHeader();
+
+    // Guard: must be logged in
+    if (!auth.requireAuth('/login.html')) { /* redirected */ }
+
+    const user = auth.getUser();
+    if (!user) { window.location.href = '/login.html'; }
+
+    // Populate profile display
+    const initials = (user.full_name || 'U').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+    document.getElementById('avatar-initial').textContent = initials;
+    document.getElementById('profile-display-name').textContent = user.full_name || 'Student';
+    document.getElementById('profile-email').textContent = user.email || '';
+    document.getElementById('page-greeting').textContent = `Welcome, ${(user.full_name || 'Student').split(' ')[0]}!`;
+
+    const roleLabel = user.role === 'admin' ? 'Transport Admin' : 'Student';
+    document.getElementById('profile-role-label').textContent = roleLabel;
+    if (user.role === 'admin') {
+      document.getElementById('admin-nav-link').style.display = '';
+    }
+
+    // Pre-fill form
+    document.getElementById('edit-name').value = user.full_name || '';
+    document.getElementById('edit-email').value = user.email || '';
+
+    // Load server profile for additional fields
+    ApiClient.getProfile().then(data => {
+      const p = data?.data;
+      if (p?.phone) document.getElementById('edit-phone').value = p.phone;
+    }).catch(() => {});
+
+    // Save profile
+    document.getElementById('profile-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const errorEl = document.getElementById('profile-save-error');
+      const successEl = document.getElementById('profile-save-success');
+      errorEl.style.display = 'none';
+      successEl.style.display = 'none';
+
+      const name = document.getElementById('edit-name').value.trim();
+      const phone = document.getElementById('edit-phone').value.trim();
+      if (!name) { errorEl.textContent = 'Full name is required.'; errorEl.style.display = ''; return; }
+
+      const btn = document.getElementById('save-profile-btn');
+      btn.disabled = true; btn.style.opacity = '0.7';
+      try {
+        await ApiClient.updateProfile({ full_name: name, phone: phone || undefined });
+        successEl.textContent = 'Profile updated successfully!';
+        successEl.style.display = '';
+        showToast('Profile saved.', 'success');
+      } catch (err) {
+        errorEl.textContent = err.message || 'Could not save profile. Please try again.';
+        errorEl.style.display = '';
+      } finally {
+        btn.disabled = false; btn.style.opacity = '1';
+      }
+    });
+
+    // Load recent announcements
+    async function loadAnnouncements() {
+      const el = document.getElementById('dash-announcements');
+      try {
+        const data = await ApiClient.getAnnouncements();
+        const items = (data?.data || []).slice(0, 3);
+        if (!items.length) { el.innerHTML = '<p class="text-muted text-sm">No announcements at this time.</p>'; return; }
+        el.innerHTML = items.map(a => `
+          <div style="padding:var(--space-3) 0;border-bottom:1px solid var(--color-border);">
+            <div style="display:flex;align-items:center;gap:var(--space-2);margin-bottom:var(--space-1);">
+              <span class="badge badge-${a.priority === 'urgent' ? 'danger' : a.priority === 'high' ? 'warning' : 'info'}">${a.priority || 'info'}</span>
+              <span class="text-sm font-medium">${escHtml(a.title)}</span>
+            </div>
+            <div class="text-sm text-muted">${escHtml((a.body || '').substring(0, 100))}${(a.body?.length || 0) > 100 ? '…' : ''}</div>
+          </div>`).join('');
+      } catch { el.innerHTML = '<p class="text-muted text-sm">Could not load announcements.</p>'; }
+      initIcons();
+    }
+
+    // Sign out
+    document.getElementById('signout-btn').addEventListener('click', () => auth.signOut());
+
+    function escHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    loadAnnouncements();
+    initIcons();
+  </script>
+</body>
+</html>
+

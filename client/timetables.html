@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Timetables — RouteReady Campus</title>
+  <meta name="description" content="Morning and evening bus timetables for all routes at Apex Institute of Technology." />
+  <link rel="stylesheet" href="/css/base.css" />
+  <link rel="stylesheet" href="/css/layout.css" />
+  <link rel="stylesheet" href="/css/components.css" />
+  <link rel="stylesheet" href="/css/pages.css" />
+  <link rel="stylesheet" href="/css/responsive.css" />
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" defer></script>
+  <style>
+    .timetables-header {
+      background: var(--color-primary);
+      color: white;
+      padding: var(--space-10) 0 var(--space-8);
+    }
+    .timetables-header h1 { font-size: var(--font-size-3xl); font-weight: 800; margin-bottom: var(--space-2); }
+    .timetables-header p { opacity: 0.85; }
+    .timetables-notice {
+      background: #fef3c7;
+      border: 1px solid #fde68a;
+      border-radius: var(--radius-lg);
+      padding: var(--space-4) var(--space-5);
+      display: flex;
+      gap: var(--space-3);
+      align-items: flex-start;
+      margin: var(--space-6) 0;
+      font-size: var(--font-size-sm);
+      color: #92400e;
+    }
+    .period-switcher {
+      display: flex;
+      gap: var(--space-2);
+      margin-bottom: var(--space-6);
+    }
+    .period-btn {
+      padding: var(--space-3) var(--space-6);
+      border: 2px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      background: var(--color-surface);
+      font-size: var(--font-size-sm);
+      font-weight: 600;
+      color: var(--color-text-muted);
+      cursor: pointer;
+      transition: var(--transition);
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+    }
+    .period-btn.active {
+      border-color: var(--color-primary);
+      background: var(--color-primary);
+      color: white;
+    }
+    .period-btn:hover:not(.active) {
+      border-color: var(--color-primary);
+      color: var(--color-primary);
+    }
+    .route-timetable-section {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-xl);
+      margin-bottom: var(--space-6);
+      overflow: hidden;
+    }
+    .route-tt-header {
+      display: flex;
+      align-items: center;
+      gap: var(--space-4);
+      padding: var(--space-5) var(--space-6);
+      border-bottom: 1px solid var(--color-border);
+      background: var(--color-surface-subtle);
+    }
+    .route-tt-name {
+      font-weight: 700;
+      font-size: var(--font-size-lg);
+      color: var(--color-primary);
+    }
+    .route-tt-body { padding: var(--space-5) var(--space-6); }
+    .tt-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: var(--space-4);
+    }
+    .schedule-card {
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+    }
+    .schedule-card-header {
+      padding: var(--space-3) var(--space-4);
+      background: var(--color-primary-soft);
+      border-bottom: 1px solid var(--color-border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .schedule-card-depart {
+      font-size: var(--font-size-2xl);
+      font-weight: 800;
+      color: var(--color-primary);
+      font-variant-numeric: tabular-nums;
+    }
+    .schedule-card-body { padding: var(--space-3) var(--space-4); }
+    .stop-time-row {
+      display: flex;
+      justify-content: space-between;
+      padding: var(--space-1) 0;
+      font-size: var(--font-size-xs);
+      border-bottom: 1px dotted var(--color-border);
+    }
+    .stop-time-row:last-child { border-bottom: none; }
+    .stop-time-name { color: var(--color-text-muted); }
+    .stop-time-val { font-weight: 600; color: var(--color-primary-dark); font-variant-numeric: tabular-nums; }
+    .route-filter-bar {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      margin-bottom: var(--space-5);
+    }
+    .route-filter-select {
+      padding: var(--space-2) var(--space-4);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      background: var(--color-surface);
+      font-size: var(--font-size-sm);
+      color: var(--color-text-main);
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <header class="site-header" id="site-header"></header>
+
+  <div class="timetables-header">
+    <div class="container">
+      <h1>
+        <i data-lucide="clock" style="width:32px;height:32px;display:inline;vertical-align:text-bottom;"></i>
+        Bus Timetables
+      </h1>
+      <p>Scheduled departure and stop times for all routes. Morning and evening services.</p>
+    </div>
+  </div>
+
+  <main class="container" style="padding-bottom:var(--space-12);">
+
+    <div class="timetables-notice">
+      <i data-lucide="info" style="width:18px;height:18px;flex-shrink:0;margin-top:1px;"></i>
+      <div>
+        <strong>Scheduled Timings Only.</strong> These are the planned departure and arrival times.
+        Actual bus timings may vary due to traffic conditions. This portal does not provide real-time tracking.
+      </div>
+    </div>
+
+    <div class="period-switcher" role="group" aria-label="Select service period">
+      <button class="period-btn active" data-period="morning" id="btn-morning">
+        <i data-lucide="sunrise" style="width:16px;height:16px;"></i> Morning Service
+      </button>
+      <button class="period-btn" data-period="evening" id="btn-evening">
+        <i data-lucide="sunset" style="width:16px;height:16px;"></i> Evening Service
+      </button>
+      <button class="period-btn" data-period="all" id="btn-all">
+        <i data-lucide="list" style="width:16px;height:16px;"></i> All Schedules
+      </button>
+    </div>
+
+    <div class="route-filter-bar">
+      <label for="route-filter" style="font-size:var(--font-size-sm);color:var(--color-text-muted);">Filter by route:</label>
+      <select id="route-filter" class="route-filter-select">
+        <option value="">All Routes</option>
+      </select>
+    </div>
+
+    <div id="timetables-content">
+      <div class="loading-state" style="text-align:center;padding:var(--space-12);">
+        <i data-lucide="loader-circle" class="spin" style="width:28px;height:28px;"></i>
+        <div style="margin-top:var(--space-3);color:var(--color-text-muted);">Loading timetables…</div>
+      </div>
+    </div>
+
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-bottom">
+        <span>&copy; 2024 Apex Institute of Technology</span>
+        <span>Scheduled timings only. Not a live tracking service.</span>
+      </div>
+    </div>
+  </footer>
+
+  <div id="toast-container"></div>
+
+  <script type="module">
+    import { renderHeader } from '/js/navigation.js';
+    import { ApiClient } from '/js/api.js';
+    import { initIcons } from '/js/components/ui.js';
+
+    renderHeader();
+
+    let allTimetableData = [];
+    let selectedPeriod = 'morning';
+    let selectedRoute = '';
+
+    async function loadTimetables() {
+      try {
+        const data = await ApiClient.getTimetables();
+        allTimetableData = data?.data || [];
+
+        // Populate route filter
+        const routeNames = [...new Set(allTimetableData.map(t => t.route_name).filter(Boolean))];
+        const select = document.getElementById('route-filter');
+        routeNames.forEach(name => {
+          const opt = document.createElement('option');
+          opt.value = name;
+          opt.textContent = name;
+          select.appendChild(opt);
+        });
+
+        renderTimetables();
+      } catch (err) {
+        document.getElementById('timetables-content').innerHTML =
+          `<div class="empty-state"><p style="color:var(--color-danger);">Could not load timetables. ${escHtml(err.message)}</p></div>`;
+        initIcons();
+      }
+    }
+
+    function renderTimetables() {
+      const el = document.getElementById('timetables-content');
+      let data = allTimetableData;
+
+      // Filter by period
+      if (selectedPeriod !== 'all') {
+        data = data.filter(t => t.service_period === selectedPeriod);
+      }
+
+      // Filter by route
+      if (selectedRoute) {
+        data = data.filter(t => t.route_name === selectedRoute);
+      }
+
+      if (data.length === 0) {
+        el.innerHTML = `<div class="empty-state" style="text-align:center;padding:var(--space-10);">
+          <i data-lucide="clock-off" style="width:40px;height:40px;color:var(--color-text-subtle);"></i>
+          <p style="color:var(--color-text-muted);margin-top:var(--space-3);">No timetables available for the selected period.</p>
+        </div>`;
+        initIcons();
+        return;
+      }
+
+      // Group by route
+      const byRoute = {};
+      data.forEach(t => {
+        const key = t.route_id || t.route_name || 'unknown';
+        if (!byRoute[key]) byRoute[key] = { route_name: t.route_name, route_id: t.route_id, schedules: [] };
+        byRoute[key].schedules.push(t);
+      });
+
+      el.innerHTML = Object.values(byRoute).map(group => `
+        <div class="route-timetable-section">
+          <div class="route-tt-header">
+            <i data-lucide="bus-front" style="width:20px;height:20px;color:var(--color-primary);"></i>
+            <span class="route-tt-name">${escHtml(group.route_name || 'Route')}</span>
+            <span class="badge badge-info">${group.schedules.length} schedule${group.schedules.length > 1 ? 's' : ''}</span>
+            <a href="/route-detail.html?id=${encodeURIComponent(group.route_id || '')}" class="btn btn-outline btn-sm" style="margin-left:auto;">
+              <i data-lucide="map" style="width:13px;height:13px;"></i>
+              View on Map
+            </a>
+          </div>
+          <div class="route-tt-body">
+            <div class="tt-grid">
+              ${group.schedules.map(s => `
+                <div class="schedule-card">
+                  <div class="schedule-card-header">
+                    <div>
+                      <div class="schedule-card-depart">${fmtTime(s.departure_time)}</div>
+                      <div style="font-size:var(--font-size-xs);color:var(--color-text-muted);">Departure</div>
+                    </div>
+                    <div style="text-align:right;">
+                      <span class="badge badge-${s.service_period === 'morning' ? 'info' : 'warning'}">${escHtml(s.service_period || '')}</span>
+                      ${s.arrival_time ? `<div style="font-size:var(--font-size-xs);color:var(--color-text-muted);margin-top:4px;">Arrives: ${fmtTime(s.arrival_time)}</div>` : ''}
+                    </div>
+                  </div>
+                  <div class="schedule-card-body">
+                    ${s.stop_times?.length ? s.stop_times.map(st => `
+                      <div class="stop-time-row">
+                        <span class="stop-time-name">${escHtml(st.stop_name || st.stop?.name || 'Stop')}</span>
+                        <span class="stop-time-val">${fmtTime(st.scheduled_time)}</span>
+                      </div>`).join('') : `<p style="font-size:var(--font-size-xs);color:var(--color-text-subtle);">No stop times defined.</p>`}
+                  </div>
+                </div>`).join('')}
+            </div>
+          </div>
+        </div>`).join('');
+      initIcons();
+    }
+
+    // Period buttons
+    document.querySelectorAll('.period-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        selectedPeriod = btn.dataset.period;
+        renderTimetables();
+      });
+    });
+
+    // Route filter
+    document.getElementById('route-filter').addEventListener('change', (e) => {
+      selectedRoute = e.target.value;
+      renderTimetables();
+    });
+
+    function fmtTime(t) {
+      if (!t) return '—';
+      const parts = String(t).split(':');
+      let h = parseInt(parts[0], 10);
+      const m = parts[1] || '00';
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      h = h % 12 || 12;
+      return `${h}:${m} ${ampm}`;
+    }
+
+    function escHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    loadTimetables();
+    initIcons();
+  </script>
+</body>
+</html>
+

@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Manage Buses — RouteReady Campus Admin</title>
+  <link rel="stylesheet" href="/css/base.css" />
+  <link rel="stylesheet" href="/css/layout.css" />
+  <link rel="stylesheet" href="/css/components.css" />
+  <link rel="stylesheet" href="/css/pages.css" />
+  <link rel="stylesheet" href="/css/responsive.css" />
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" defer></script>
+  <style>
+    .admin-page-header {
+      background: var(--color-primary-dark);
+      color: white;
+      padding: var(--space-6) 0;
+    }
+    .admin-page-header h1 { font-size: var(--font-size-xl); font-weight: 700; }
+    .admin-page-header p { font-size: var(--font-size-sm); opacity: 0.7; margin-top: 2px; }
+    .action-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--space-5);
+      flex-wrap: wrap;
+      gap: var(--space-3);
+    }
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.45);
+      z-index: 999;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-box {
+      background: var(--color-surface);
+      border-radius: var(--radius-xl);
+      box-shadow: var(--shadow-xl);
+      width: 100%;
+      max-width: 520px;
+      max-height: 90vh;
+      overflow-y: auto;
+      padding: var(--space-8);
+      margin: var(--space-4);
+      position: relative;
+    }
+    .modal-title {
+      font-size: var(--font-size-xl);
+      font-weight: 700;
+      margin-bottom: var(--space-6);
+      color: var(--color-primary);
+    }
+    .modal-close {
+      position: absolute;
+      top: var(--space-4);
+      right: var(--space-4);
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--color-text-muted);
+      padding: var(--space-2);
+      border-radius: var(--radius-md);
+    }
+    .modal-close:hover { background: var(--color-surface-subtle); }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
+    .modal-actions { display: flex; gap: var(--space-3); margin-top: var(--space-6); justify-content: flex-end; }
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: var(--font-size-xs);
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: var(--radius-full);
+    }
+    .status-badge.active { background: #d1fae5; color: #065f46; }
+    .status-badge.inactive { background: var(--color-surface-subtle); color: var(--color-text-muted); }
+    .table-actions { display: flex; gap: var(--space-2); }
+  </style>
+</head>
+<body>
+  <header class="site-header" id="site-header"></header>
+
+  <div class="admin-page-header">
+    <div class="container">
+      <h1><i data-lucide="bus-front" style="width:20px;height:20px;display:inline;vertical-align:text-bottom;margin-right:6px;"></i>Manage Buses</h1>
+      <p>Add, edit, and deactivate buses in the fleet</p>
+    </div>
+  </div>
+
+  <div class="admin-layout">
+    <!-- Sidebar -->
+    <nav class="admin-sidebar" aria-label="Admin navigation">
+      <div class="admin-sidebar-nav">
+        <a href="/admin/index.html" class="admin-nav-item">
+          <i data-lucide="layout-dashboard" style="width:16px;height:16px;"></i> Dashboard
+        </a>
+        <a href="/admin/buses.html" class="admin-nav-item active">
+          <i data-lucide="bus-front" style="width:16px;height:16px;"></i> Buses
+        </a>
+        <a href="/admin/routes.html" class="admin-nav-item">
+          <i data-lucide="route" style="width:16px;height:16px;"></i> Routes &amp; Stops
+        </a>
+        <a href="/admin/announcements.html" class="admin-nav-item">
+          <i data-lucide="megaphone" style="width:16px;height:16px;"></i> Announcements
+        </a>
+      </div>
+      <div style="margin-top:var(--space-4);">
+        <a href="/index.html" class="admin-nav-item">
+          <i data-lucide="home" style="width:16px;height:16px;"></i> Student Portal
+        </a>
+        <button id="admin-signout-btn" class="btn btn-outline btn-sm btn-block" style="margin-top:var(--space-4);">
+          <i data-lucide="log-out" style="width:14px;height:14px;"></i> Sign Out
+        </button>
+      </div>
+    </nav>
+
+    <!-- Content -->
+    <main class="admin-content">
+      <div class="action-bar">
+        <div>
+          <h2 style="font-size:var(--font-size-lg);font-weight:700;">Bus Fleet</h2>
+          <p class="text-muted text-sm" id="bus-count-label">Loading buses…</p>
+        </div>
+        <button class="btn btn-primary" id="add-bus-btn">
+          <i data-lucide="plus" style="width:15px;height:15px;"></i>
+          Add New Bus
+        </button>
+      </div>
+
+      <div style="background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-xl);overflow:hidden;">
+        <div style="overflow-x:auto;">
+          <table class="data-table" id="buses-table">
+            <thead>
+              <tr>
+                <th>Bus Number</th>
+                <th>Capacity</th>
+                <th>Driver</th>
+                <th>Driver Phone</th>
+                <th>Status</th>
+                <th style="text-align:right;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="buses-tbody">
+              <tr><td colspan="6" style="text-align:center;padding:var(--space-8);">
+                <i data-lucide="loader-circle" class="spin" style="width:20px;height:20px;"></i>
+              </td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Add/Edit Bus Modal -->
+  <div class="modal-overlay" id="bus-modal" role="dialog" aria-modal="true" aria-labelledby="bus-modal-title">
+    <div class="modal-box">
+      <button class="modal-close" id="bus-modal-close" aria-label="Close modal">
+        <i data-lucide="x" style="width:18px;height:18px;"></i>
+      </button>
+      <div class="modal-title" id="bus-modal-title">Add New Bus</div>
+      <form id="bus-form" novalidate>
+        <input type="hidden" id="bus-id" />
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="bus-number">Bus Number / Plate <span class="required">*</span></label>
+            <input type="text" id="bus-number" class="form-input" placeholder="KA-01-AB-1234" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="bus-capacity">Seating Capacity <span class="required">*</span></label>
+            <input type="number" id="bus-capacity" class="form-input" placeholder="50" min="1" max="200" required />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="bus-driver">Driver Name</label>
+            <input type="text" id="bus-driver" class="form-input" placeholder="Driver full name" />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="bus-driver-phone">Driver Phone</label>
+            <input type="tel" id="bus-driver-phone" class="form-input" placeholder="+91 98765 43210" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="bus-notes">Notes / Description</label>
+          <textarea id="bus-notes" class="form-input" rows="2" placeholder="Any additional notes about this bus…" style="resize:vertical;"></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Status</label>
+          <div style="display:flex;align-items:center;gap:var(--space-3);">
+            <input type="checkbox" id="bus-active" checked style="width:18px;height:18px;cursor:pointer;" />
+            <label for="bus-active" style="cursor:pointer;font-size:var(--font-size-sm);">Active (visible to students)</label>
+          </div>
+        </div>
+        <div id="bus-form-error" class="form-error" style="display:none;"></div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-outline" id="bus-cancel-btn">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="bus-submit-btn">Save Bus</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Deactivate Confirm Modal -->
+  <div class="modal-overlay" id="deactivate-modal" role="dialog" aria-modal="true">
+    <div class="modal-box" style="max-width:400px;">
+      <div class="modal-title" style="color:var(--color-danger);">Deactivate Bus</div>
+      <p style="color:var(--color-text-muted);font-size:var(--font-size-sm);margin-bottom:var(--space-5);">
+        Are you sure you want to deactivate bus <strong id="deactivate-bus-number"></strong>?
+        It will be hidden from students. You can reactivate it later.
+      </p>
+      <div id="deactivate-error" class="form-error" style="display:none;"></div>
+      <div class="modal-actions">
+        <button class="btn btn-outline" id="deactivate-cancel-btn">Cancel</button>
+        <button class="btn btn-danger" id="deactivate-confirm-btn">Deactivate</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast-container"></div>
+
+  <script type="module">
+    import { renderHeader } from '/js/navigation.js';
+    import { auth } from '/js/auth.js';
+    import { ApiClient } from '/js/api.js';
+    import { showToast, initIcons } from '/js/components/ui.js';
+
+    renderHeader();
+    if (!auth.requireAdmin('/dashboard.html')) { /* redirected */ }
+    document.getElementById('admin-signout-btn').addEventListener('click', () => auth.signOut());
+
+    let allBuses = [];
+    let deactivateTarget = null;
+
+    // Load buses
+    async function loadBuses() {
+      const tbody = document.getElementById('buses-tbody');
+      try {
+        const data = await ApiClient.getBuses();
+        allBuses = data?.data || [];
+        document.getElementById('bus-count-label').textContent = `${allBuses.length} bus${allBuses.length !== 1 ? 'es' : ''} in fleet`;
+        renderTable();
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="6" style="color:var(--color-danger);text-align:center;padding:var(--space-8);">
+          Could not load buses: ${escHtml(err.message)}</td></tr>`;
+        initIcons();
+      }
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById('buses-tbody');
+      if (!allBuses.length) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:var(--space-8);color:var(--color-text-subtle);">
+          No buses found. Add your first bus using the button above.</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = allBuses.map(b => `
+        <tr>
+          <td><strong>${escHtml(b.bus_number || b.plate_number || '—')}</strong></td>
+          <td>${escHtml(String(b.capacity || '—'))}</td>
+          <td>${escHtml(b.driver_name || '—')}</td>
+          <td>${escHtml(b.driver_phone || '—')}</td>
+          <td>
+            <span class="status-badge ${b.is_active !== false ? 'active' : 'inactive'}">
+              <i data-lucide="${b.is_active !== false ? 'check-circle' : 'circle-slash'}" style="width:12px;height:12px;"></i>
+              ${b.is_active !== false ? 'Active' : 'Inactive'}
+            </span>
+          </td>
+          <td>
+            <div class="table-actions" style="justify-content:flex-end;">
+              <button class="btn btn-outline btn-sm" data-edit="${b.id}" title="Edit bus">
+                <i data-lucide="pencil" style="width:13px;height:13px;"></i> Edit
+              </button>
+              ${b.is_active !== false ? `
+              <button class="btn btn-sm" style="border:1px solid var(--color-danger);color:var(--color-danger);background:none;" data-deactivate="${b.id}" data-bus-number="${escHtml(b.bus_number || '')}" title="Deactivate bus">
+                <i data-lucide="power-off" style="width:13px;height:13px;"></i>
+              </button>` : ''}
+            </div>
+          </td>
+        </tr>`).join('');
+      initIcons();
+
+      // Edit buttons
+      tbody.querySelectorAll('[data-edit]').forEach(btn => {
+        btn.addEventListener('click', () => openEditModal(btn.dataset.edit));
+      });
+      // Deactivate buttons
+      tbody.querySelectorAll('[data-deactivate]').forEach(btn => {
+        btn.addEventListener('click', () => openDeactivateModal(btn.dataset.deactivate, btn.dataset.busNumber));
+      });
+    }
+
+    // Modal helpers
+    function openAddModal() {
+      document.getElementById('bus-modal-title').textContent = 'Add New Bus';
+      document.getElementById('bus-form').reset();
+      document.getElementById('bus-id').value = '';
+      document.getElementById('bus-active').checked = true;
+      document.getElementById('bus-form-error').style.display = 'none';
+      document.getElementById('bus-modal').classList.add('open');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function openEditModal(id) {
+      const bus = allBuses.find(b => String(b.id) === String(id));
+      if (!bus) return;
+      document.getElementById('bus-modal-title').textContent = 'Edit Bus';
+      document.getElementById('bus-id').value = bus.id;
+      document.getElementById('bus-number').value = bus.bus_number || bus.plate_number || '';
+      document.getElementById('bus-capacity').value = bus.capacity || '';
+      document.getElementById('bus-driver').value = bus.driver_name || '';
+      document.getElementById('bus-driver-phone').value = bus.driver_phone || '';
+      document.getElementById('bus-notes').value = bus.notes || '';
+      document.getElementById('bus-active').checked = bus.is_active !== false;
+      document.getElementById('bus-form-error').style.display = 'none';
+      document.getElementById('bus-modal').classList.add('open');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeModal(id) {
+      document.getElementById(id).classList.remove('open');
+      document.body.style.overflow = '';
+    }
+
+    function openDeactivateModal(id, busNumber) {
+      deactivateTarget = id;
+      document.getElementById('deactivate-bus-number').textContent = busNumber;
+      document.getElementById('deactivate-error').style.display = 'none';
+      document.getElementById('deactivate-modal').classList.add('open');
+      document.body.style.overflow = 'hidden';
+    }
+
+    // Event listeners
+    document.getElementById('add-bus-btn').addEventListener('click', openAddModal);
+    document.getElementById('bus-modal-close').addEventListener('click', () => closeModal('bus-modal'));
+    document.getElementById('bus-cancel-btn').addEventListener('click', () => closeModal('bus-modal'));
+    document.getElementById('deactivate-cancel-btn').addEventListener('click', () => closeModal('deactivate-modal'));
+
+    // Close on overlay click
+    document.getElementById('bus-modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeModal('bus-modal'); });
+    document.getElementById('deactivate-modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeModal('deactivate-modal'); });
+
+    // Submit bus form
+    document.getElementById('bus-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const errorEl = document.getElementById('bus-form-error');
+      errorEl.style.display = 'none';
+      const id = document.getElementById('bus-id').value;
+      const busNumber = document.getElementById('bus-number').value.trim();
+      const capacity = parseInt(document.getElementById('bus-capacity').value, 10);
+      if (!busNumber) { errorEl.textContent = 'Bus number is required.'; errorEl.style.display = ''; return; }
+      if (!capacity || capacity < 1) { errorEl.textContent = 'Valid capacity is required.'; errorEl.style.display = ''; return; }
+
+      const payload = {
+        bus_number: busNumber,
+        plate_number: busNumber,
+        capacity,
+        driver_name: document.getElementById('bus-driver').value.trim() || undefined,
+        driver_phone: document.getElementById('bus-driver-phone').value.trim() || undefined,
+        notes: document.getElementById('bus-notes').value.trim() || undefined,
+        is_active: document.getElementById('bus-active').checked
+      };
+
+      const btn = document.getElementById('bus-submit-btn');
+      btn.disabled = true; btn.textContent = 'Saving…';
+      try {
+        if (id) {
+          await ApiClient.updateBus(id, payload);
+          showToast('Bus updated successfully.', 'success');
+        } else {
+          await ApiClient.createBus(payload);
+          showToast('Bus added successfully.', 'success');
+        }
+        closeModal('bus-modal');
+        await loadBuses();
+      } catch (err) {
+        errorEl.textContent = err.message || 'Could not save bus. Please try again.';
+        errorEl.style.display = '';
+      } finally {
+        btn.disabled = false; btn.textContent = 'Save Bus';
+      }
+    });
+
+    // Deactivate confirm
+    document.getElementById('deactivate-confirm-btn').addEventListener('click', async () => {
+      if (!deactivateTarget) return;
+      const btn = document.getElementById('deactivate-confirm-btn');
+      const errorEl = document.getElementById('deactivate-error');
+      btn.disabled = true; btn.textContent = 'Deactivating…';
+      try {
+        await ApiClient.deactivateBus(deactivateTarget);
+        showToast('Bus deactivated.', 'success');
+        closeModal('deactivate-modal');
+        await loadBuses();
+      } catch (err) {
+        errorEl.textContent = err.message || 'Could not deactivate bus.';
+        errorEl.style.display = '';
+      } finally {
+        btn.disabled = false; btn.textContent = 'Deactivate';
+      }
+    });
+
+    function escHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    loadBuses();
+    initIcons();
+  </script>
+</body>
+</html>
+

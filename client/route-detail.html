@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Route Details — RouteReady Campus</title>
+  <meta name="description" content="Detailed route view with interactive map and stop-by-stop timeline." />
+  <link rel="stylesheet" href="/css/base.css" />
+  <link rel="stylesheet" href="/css/layout.css" />
+  <link rel="stylesheet" href="/css/components.css" />
+  <link rel="stylesheet" href="/css/pages.css" />
+  <link rel="stylesheet" href="/css/responsive.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" defer></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
+  <style>
+    .route-detail-header {
+      background: var(--color-primary);
+      color: white;
+      padding: var(--space-8) 0;
+    }
+    .route-detail-breadcrumb {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      font-size: var(--font-size-sm);
+      opacity: 0.8;
+      margin-bottom: var(--space-3);
+    }
+    .route-detail-breadcrumb a { color: rgba(255,255,255,0.8); }
+    .route-detail-breadcrumb a:hover { color: white; }
+    .route-detail-title { font-size: var(--font-size-3xl); font-weight: 800; margin-bottom: var(--space-2); }
+    .route-detail-meta { display: flex; gap: var(--space-4); flex-wrap: wrap; }
+    .route-meta-chip {
+      display: flex;
+      align-items: center;
+      gap: var(--space-1);
+      background: rgba(255,255,255,0.15);
+      padding: var(--space-1) var(--space-3);
+      border-radius: var(--radius-full);
+      font-size: var(--font-size-sm);
+    }
+    .route-detail-body {
+      display: grid;
+      grid-template-columns: 1fr 360px;
+      gap: var(--space-8);
+      padding: var(--space-8) 0;
+      align-items: start;
+    }
+    #detail-map {
+      width: 100%;
+      height: 420px;
+      border-radius: var(--radius-xl);
+      overflow: hidden;
+      box-shadow: var(--shadow-lg);
+    }
+    .stop-timeline-card {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-xl);
+      padding: var(--space-5);
+    }
+    .stop-timeline-card h3 {
+      font-size: var(--font-size-base);
+      font-weight: 700;
+      margin-bottom: var(--space-4);
+      color: var(--color-primary);
+    }
+    .tl-item {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--space-3);
+      padding: var(--space-3) 0;
+      position: relative;
+    }
+    .tl-item:not(:last-child)::after {
+      content: '';
+      position: absolute;
+      left: 11px;
+      top: 32px;
+      bottom: 0;
+      width: 2px;
+      background: var(--color-border);
+    }
+    .tl-dot {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      font-weight: 700;
+      color: white;
+      flex-shrink: 0;
+      position: relative;
+      z-index: 1;
+    }
+    .tl-info { flex: 1; }
+    .tl-name { font-weight: 600; font-size: var(--font-size-sm); color: var(--color-text-main); }
+    .tl-locality { font-size: var(--font-size-xs); color: var(--color-text-muted); }
+    .tl-time { font-size: var(--font-size-xs); color: var(--color-text-subtle); font-variant-numeric: tabular-nums; margin-top: 2px; }
+    .schedule-section {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-xl);
+      padding: var(--space-6);
+      margin-bottom: var(--space-8);
+    }
+    .schedule-tabs {
+      display: flex;
+      gap: var(--space-1);
+      background: var(--color-surface-subtle);
+      border-radius: var(--radius-md);
+      padding: 3px;
+      margin-bottom: var(--space-5);
+      width: fit-content;
+    }
+    .sched-tab {
+      padding: var(--space-2) var(--space-5);
+      border: none;
+      background: transparent;
+      border-radius: calc(var(--radius-md) - 2px);
+      font-size: var(--font-size-sm);
+      font-weight: 500;
+      color: var(--color-text-muted);
+      cursor: pointer;
+      transition: var(--transition);
+    }
+    .sched-tab.active {
+      background: var(--color-surface);
+      color: var(--color-primary);
+      font-weight: 600;
+      box-shadow: var(--shadow-sm);
+    }
+    .schedule-table-wrap { overflow-x: auto; }
+    @media (max-width: 900px) {
+      .route-detail-body { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header class="site-header" id="site-header"></header>
+
+  <div id="page-loading" style="text-align:center;padding:var(--space-16);">
+    <i data-lucide="loader-circle" class="spin" style="width:32px;height:32px;color:var(--color-primary);"></i>
+  </div>
+
+  <div id="page-content" style="display:none;">
+    <div class="route-detail-header">
+      <div class="container">
+        <div class="route-detail-breadcrumb">
+          <a href="/routes.html">Routes</a>
+          <i data-lucide="chevron-right" style="width:14px;height:14px;"></i>
+          <span id="breadcrumb-name"></span>
+        </div>
+        <h1 class="route-detail-title" id="route-title">Route</h1>
+        <div class="route-detail-meta" id="route-meta"></div>
+      </div>
+    </div>
+
+    <div class="container">
+      <div class="route-detail-body">
+        <!-- Map -->
+        <div>
+          <div id="detail-map"></div>
+          <p style="margin-top:var(--space-2);font-size:var(--font-size-xs);color:var(--color-text-subtle);">
+            <i data-lucide="info" style="width:12px;height:12px;display:inline;"></i>
+            Map shows scheduled stop positions. This is not a live tracking service.
+          </p>
+        </div>
+
+        <!-- Stop Timeline Sidebar -->
+        <div class="stop-timeline-card">
+          <h3>
+            <i data-lucide="list-ordered" style="width:16px;height:16px;display:inline;"></i>
+            Stops on this route
+          </h3>
+          <div id="stop-timeline-list">
+            <div class="loading-state">Loading stops…</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Schedules -->
+      <div class="schedule-section">
+        <h2 style="font-size:var(--font-size-xl);font-weight:700;margin-bottom:var(--space-4);">
+          <i data-lucide="clock" style="width:18px;height:18px;display:inline;color:var(--color-primary);"></i>
+          Timetable for this Route
+        </h2>
+        <div class="schedule-tabs" id="sched-tabs">
+          <button class="sched-tab active" data-period="morning">🌅 Morning</button>
+          <button class="sched-tab" data-period="evening">🌇 Evening</button>
+        </div>
+        <div id="schedule-content">
+          <div class="loading-state">Loading timetable…</div>
+        </div>
+      </div>
+
+      <div style="margin-bottom:var(--space-8);">
+        <a href="/routes.html" class="btn btn-outline">
+          <i data-lucide="arrow-left" style="width:15px;height:15px;"></i>
+          Back to All Routes
+        </a>
+        <a href="/timetables.html" class="btn btn-outline" style="margin-left:var(--space-2);">
+          <i data-lucide="clock" style="width:15px;height:15px;"></i>
+          Full Timetables
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div id="page-error" style="display:none;text-align:center;padding:var(--space-16);">
+    <i data-lucide="bus-off" style="width:48px;height:48px;color:var(--color-text-subtle);"></i>
+    <h2 style="margin-top:var(--space-4);">Route Not Found</h2>
+    <p style="color:var(--color-text-muted);margin-top:var(--space-2);">The requested route could not be loaded.</p>
+    <a href="/routes.html" class="btn btn-primary" style="margin-top:var(--space-4);">View All Routes</a>
+  </div>
+
+  <div id="toast-container"></div>
+
+  <script type="module">
+    import { renderHeader } from '/js/navigation.js';
+    import { ApiClient } from '/js/api.js';
+    import { CampusMap } from '/js/map.js';
+    import { initIcons } from '/js/components/ui.js';
+
+    renderHeader();
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const routeId = urlParams.get('id');
+
+    let campusMap = null;
+    let routeData = null;
+    let selectedPeriod = 'morning';
+
+    async function loadRoute() {
+      if (!routeId) { showError(); return; }
+      try {
+        const data = await ApiClient.getRouteById(routeId);
+        routeData = data?.data;
+        if (!routeData) { showError(); return; }
+        renderRoute(routeData);
+        document.getElementById('page-loading').style.display = 'none';
+        document.getElementById('page-content').style.display = '';
+        initIcons();
+      } catch { showError(); }
+    }
+
+    function renderRoute(r) {
+      document.title = `${r.name} — RouteReady Campus`;
+      document.getElementById('breadcrumb-name').textContent = r.name;
+      document.getElementById('route-title').textContent = r.name;
+
+      const meta = document.getElementById('route-meta');
+      meta.innerHTML = [
+        r.bus_number ? `<div class="route-meta-chip"><i data-lucide="bus-front" style="width:14px;height:14px;"></i> Bus ${escHtml(r.bus_number)}</div>` : '',
+        r.stops?.length ? `<div class="route-meta-chip"><i data-lucide="map-pin" style="width:14px;height:14px;"></i> ${r.stops.length} Stops</div>` : '',
+        r.is_active !== false ? `<div class="route-meta-chip"><i data-lucide="check-circle" style="width:14px;height:14px;"></i> Active</div>` : `<div class="route-meta-chip"><i data-lucide="circle-slash" style="width:14px;height:14px;"></i> Inactive</div>`,
+      ].join('');
+
+      // Stops timeline
+      renderStopTimeline(r.stops || []);
+
+      // Map
+      campusMap = new CampusMap('detail-map', { zoom: 12 });
+      campusMap.init();
+      campusMap.renderRouteStops(r.stops || []);
+
+      // Schedules
+      renderSchedules(r.schedules || [], selectedPeriod);
+    }
+
+    function renderStopTimeline(stops) {
+      const el = document.getElementById('stop-timeline-list');
+      if (!stops.length) { el.innerHTML = '<p class="text-muted text-sm">No stops available.</p>'; return; }
+      const colors = ['#0d9488', '#1e3a8a', '#0f172a'];
+      el.innerHTML = stops.map((s, i) => {
+        const colorIdx = i === 0 ? 0 : i === stops.length - 1 ? 2 : 1;
+        return `
+          <div class="tl-item">
+            <div class="tl-dot" style="background:${colors[colorIdx]};">${i + 1}</div>
+            <div class="tl-info">
+              <div class="tl-name">${escHtml(s.name)}</div>
+              ${s.locality ? `<div class="tl-locality">${escHtml(s.locality)}</div>` : ''}
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    function renderSchedules(schedules, period) {
+      const el = document.getElementById('schedule-content');
+      const filtered = period === 'all' ? schedules : schedules.filter(s => s.service_period === period);
+      if (!filtered.length) {
+        el.innerHTML = `<div class="empty-state"><p>No ${period} schedules available for this route.</p></div>`;
+        return;
+      }
+      el.innerHTML = filtered.map(s => `
+        <div style="margin-bottom:var(--space-5);">
+          <div style="display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-3);">
+            <span class="badge badge-${s.service_period === 'morning' ? 'info' : 'warning'}">${escHtml(s.service_period)}</span>
+            <span style="font-size:var(--font-size-sm);color:var(--color-text-muted);">
+              Departs: <strong>${fmtTime(s.departure_time)}</strong>
+              ${s.arrival_time ? ` — Arrives: <strong>${fmtTime(s.arrival_time)}</strong>` : ''}
+            </span>
+          </div>
+          ${s.stop_times?.length ? `
+          <div class="schedule-table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Stop</th>
+                  <th>Scheduled Time</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${s.stop_times.map((st, si) => `
+                  <tr>
+                    <td>${si + 1}</td>
+                    <td>${escHtml(st.stop_name || st.stop?.name || '')}</td>
+                    <td style="font-variant-numeric:tabular-nums;">${fmtTime(st.scheduled_time)}</td>
+                  </tr>`).join('')}
+              </tbody>
+            </table>
+          </div>` : ''}
+        </div>`).join('<hr style="border:none;border-top:1px solid var(--color-border);margin:var(--space-5) 0;">');
+    }
+
+    // Period tab switching
+    document.getElementById('sched-tabs').addEventListener('click', (e) => {
+      const tab = e.target.closest('[data-period]');
+      if (!tab) return;
+      document.querySelectorAll('.sched-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      selectedPeriod = tab.dataset.period;
+      if (routeData) renderSchedules(routeData.schedules || [], selectedPeriod);
+    });
+
+    function showError() {
+      document.getElementById('page-loading').style.display = 'none';
+      document.getElementById('page-error').style.display = '';
+      initIcons();
+    }
+
+    function fmtTime(t) {
+      if (!t) return '—';
+      const parts = String(t).split(':');
+      let h = parseInt(parts[0], 10);
+      const m = parts[1] || '00';
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      h = h % 12 || 12;
+      return `${h}:${m} ${ampm}`;
+    }
+
+    function escHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    loadRoute();
+    initIcons();
+  </script>
+</body>
+</html>
+

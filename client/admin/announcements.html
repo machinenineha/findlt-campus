@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Manage Announcements — RouteReady Campus Admin</title>
+  <link rel="stylesheet" href="/css/base.css" />
+  <link rel="stylesheet" href="/css/layout.css" />
+  <link rel="stylesheet" href="/css/components.css" />
+  <link rel="stylesheet" href="/css/pages.css" />
+  <link rel="stylesheet" href="/css/responsive.css" />
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" defer></script>
+  <style>
+    .admin-page-header { background: var(--color-primary-dark); color: white; padding: var(--space-6) 0; }
+    .admin-page-header h1 { font-size: var(--font-size-xl); font-weight: 700; }
+    .admin-page-header p { font-size: var(--font-size-sm); opacity: 0.7; margin-top: 2px; }
+    .action-bar {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: var(--space-5); flex-wrap: wrap; gap: var(--space-3);
+    }
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.45); z-index: 999;
+      align-items: center; justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-box {
+      background: var(--color-surface); border-radius: var(--radius-xl);
+      box-shadow: var(--shadow-xl); width: 100%; max-width: 560px;
+      max-height: 90vh; overflow-y: auto; padding: var(--space-8);
+      margin: var(--space-4); position: relative;
+    }
+    .modal-title { font-size: var(--font-size-xl); font-weight: 700; margin-bottom: var(--space-5); color: var(--color-primary); }
+    .modal-close {
+      position: absolute; top: var(--space-4); right: var(--space-4);
+      background: none; border: none; cursor: pointer; color: var(--color-text-muted);
+      padding: var(--space-2); border-radius: var(--radius-md);
+    }
+    .modal-close:hover { background: var(--color-surface-subtle); }
+    .modal-actions { display: flex; gap: var(--space-3); margin-top: var(--space-6); justify-content: flex-end; }
+    .ann-card {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-xl);
+      padding: var(--space-5) var(--space-6);
+      margin-bottom: var(--space-4);
+      transition: var(--transition);
+      border-left: 4px solid transparent;
+    }
+    .ann-card:hover { box-shadow: var(--shadow-md); }
+    .ann-card.priority-urgent { border-left-color: var(--color-danger); }
+    .ann-card.priority-high { border-left-color: var(--color-warning); }
+    .ann-card.priority-normal { border-left-color: var(--color-info); }
+    .ann-card.ann-inactive { opacity: 0.6; }
+    .ann-card-header {
+      display: flex; align-items: flex-start;
+      justify-content: space-between; gap: var(--space-4); margin-bottom: var(--space-2);
+    }
+    .ann-title { font-size: var(--font-size-base); font-weight: 700; color: var(--color-text-main); }
+    .ann-meta { font-size: var(--font-size-xs); color: var(--color-text-subtle); margin-bottom: var(--space-2); }
+    .ann-body { font-size: var(--font-size-sm); color: var(--color-text-muted); white-space: pre-line; }
+    .ann-actions { display: flex; gap: var(--space-2); margin-top: var(--space-4); }
+    .filter-bar { display: flex; gap: var(--space-2); margin-bottom: var(--space-5); flex-wrap: wrap; }
+    .filter-chip {
+      padding: var(--space-1) var(--space-3);
+      border: 1px solid var(--color-border); border-radius: var(--radius-full);
+      font-size: var(--font-size-xs); font-weight: 500; color: var(--color-text-muted);
+      background: var(--color-surface); cursor: pointer; transition: var(--transition);
+    }
+    .filter-chip.active { background: var(--color-primary); color: white; border-color: var(--color-primary); }
+  </style>
+</head>
+<body>
+  <header class="site-header" id="site-header"></header>
+
+  <div class="admin-page-header">
+    <div class="container">
+      <h1>
+        <i data-lucide="megaphone" style="width:20px;height:20px;display:inline;vertical-align:text-bottom;margin-right:6px;"></i>
+        Announcements
+      </h1>
+      <p>Post, edit and manage transport notices for students</p>
+    </div>
+  </div>
+
+  <div class="admin-layout">
+    <!-- Sidebar -->
+    <nav class="admin-sidebar" aria-label="Admin navigation">
+      <div class="admin-sidebar-nav">
+        <a href="/admin/index.html" class="admin-nav-item">
+          <i data-lucide="layout-dashboard" style="width:16px;height:16px;"></i> Dashboard
+        </a>
+        <a href="/admin/buses.html" class="admin-nav-item">
+          <i data-lucide="bus-front" style="width:16px;height:16px;"></i> Buses
+        </a>
+        <a href="/admin/routes.html" class="admin-nav-item">
+          <i data-lucide="route" style="width:16px;height:16px;"></i> Routes &amp; Stops
+        </a>
+        <a href="/admin/announcements.html" class="admin-nav-item active">
+          <i data-lucide="megaphone" style="width:16px;height:16px;"></i> Announcements
+        </a>
+      </div>
+      <div style="margin-top:var(--space-4);">
+        <a href="/announcements.html" target="_blank" class="admin-nav-item">
+          <i data-lucide="external-link" style="width:16px;height:16px;"></i> Preview (Student View)
+        </a>
+        <a href="/index.html" class="admin-nav-item">
+          <i data-lucide="home" style="width:16px;height:16px;"></i> Student Portal
+        </a>
+        <button id="admin-signout-btn" class="btn btn-outline btn-sm btn-block" style="margin-top:var(--space-4);">
+          <i data-lucide="log-out" style="width:14px;height:14px;"></i> Sign Out
+        </button>
+      </div>
+    </nav>
+
+    <!-- Content -->
+    <main class="admin-content">
+      <div class="action-bar">
+        <div>
+          <h2 style="font-size:var(--font-size-lg);font-weight:700;">All Announcements</h2>
+          <p class="text-muted text-sm" id="ann-count-label">Loading…</p>
+        </div>
+        <button class="btn btn-primary" id="add-ann-btn">
+          <i data-lucide="plus" style="width:15px;height:15px;"></i>
+          Post Announcement
+        </button>
+      </div>
+
+      <!-- Filter chips -->
+      <div class="filter-bar" id="filter-bar">
+        <button class="filter-chip active" data-filter="all">All</button>
+        <button class="filter-chip" data-filter="urgent">Urgent</button>
+        <button class="filter-chip" data-filter="high">High</button>
+        <button class="filter-chip" data-filter="normal">Normal</button>
+        <button class="filter-chip" data-filter="active">Active Only</button>
+      </div>
+
+      <!-- Announcements list -->
+      <div id="announcements-list">
+        <div class="loading-state" style="text-align:center;padding:var(--space-10);">
+          <i data-lucide="loader-circle" class="spin" style="width:26px;height:26px;"></i>
+          <div style="margin-top:var(--space-3);color:var(--color-text-muted);">Loading announcements…</div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Create / Edit Announcement Modal -->
+  <div class="modal-overlay" id="ann-modal" role="dialog" aria-modal="true" aria-labelledby="ann-modal-title">
+    <div class="modal-box">
+      <button class="modal-close" id="ann-modal-close" aria-label="Close">
+        <i data-lucide="x" style="width:18px;height:18px;"></i>
+      </button>
+      <div class="modal-title" id="ann-modal-title">Post Announcement</div>
+
+      <form id="ann-form" novalidate>
+        <input type="hidden" id="ann-id" />
+
+        <div class="form-group">
+          <label class="form-label" for="ann-title">Title <span class="required">*</span></label>
+          <input type="text" id="ann-title" class="form-input"
+            placeholder="e.g. Route 2 schedule change on 30 Oct" required />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="ann-body">Message Body <span class="required">*</span></label>
+          <textarea id="ann-body" class="form-input" rows="5"
+            placeholder="Write the full announcement text here…"
+            style="resize:vertical;" required></textarea>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4);">
+          <div class="form-group">
+            <label class="form-label" for="ann-priority">Priority <span class="required">*</span></label>
+            <select id="ann-priority" class="form-input" required>
+              <option value="normal">Normal</option>
+              <option value="high">High</option>
+              <option value="urgent">Urgent</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="ann-expires">Expiry Date <span class="form-hint">(optional)</span></label>
+            <input type="date" id="ann-expires" class="form-input" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <div style="display:flex;align-items:center;gap:var(--space-3);">
+            <input type="checkbox" id="ann-active" checked style="width:16px;height:16px;cursor:pointer;" />
+            <label for="ann-active" style="cursor:pointer;font-size:var(--font-size-sm);">
+              Active (visible to students immediately)
+            </label>
+          </div>
+        </div>
+
+        <div id="ann-form-error" class="form-error" style="display:none;"></div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn btn-outline" id="ann-cancel-btn">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="ann-submit-btn">
+            <i data-lucide="send" style="width:14px;height:14px;"></i>
+            Publish
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Delete confirm modal -->
+  <div class="modal-overlay" id="delete-modal" role="dialog" aria-modal="true">
+    <div class="modal-box" style="max-width:400px;">
+      <div class="modal-title" style="color:var(--color-danger);">Remove Announcement</div>
+      <p style="color:var(--color-text-muted);font-size:var(--font-size-sm);margin-bottom:var(--space-5);">
+        Are you sure you want to deactivate the announcement
+        "<strong id="delete-ann-title"></strong>"?
+        It will be hidden from students.
+      </p>
+      <div id="delete-error" class="form-error" style="display:none;"></div>
+      <div class="modal-actions">
+        <button class="btn btn-outline" id="delete-cancel-btn">Cancel</button>
+        <button class="btn btn-danger" id="delete-confirm-btn">Deactivate</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast-container"></div>
+
+  <script type="module">
+    import { renderHeader } from '/js/navigation.js';
+    import { auth } from '/js/auth.js';
+    import { ApiClient } from '/js/api.js';
+    import { showToast, initIcons } from '/js/components/ui.js';
+
+    renderHeader();
+    if (!auth.requireAdmin('/dashboard.html')) { /* redirected */ }
+    document.getElementById('admin-signout-btn').addEventListener('click', () => auth.signOut());
+
+    let allAnnouncements = [];
+    let activeFilter = 'all';
+    let deleteTarget = null;
+
+    // ── Load data ─────────────────────────────────────────────
+    async function loadAnnouncements() {
+      const listEl = document.getElementById('announcements-list');
+      try {
+        const data = await ApiClient.getAllAdminAnnouncements();
+        allAnnouncements = data?.data || [];
+        document.getElementById('ann-count-label').textContent =
+          `${allAnnouncements.length} announcement${allAnnouncements.length !== 1 ? 's' : ''}`;
+        renderList();
+      } catch (err) {
+        listEl.innerHTML = `<div class="empty-state">
+          <p style="color:var(--color-danger);">Could not load announcements: ${escHtml(err.message)}</p>
+        </div>`;
+        initIcons();
+      }
+    }
+
+    // ── Render ────────────────────────────────────────────────
+    function renderList() {
+      const listEl = document.getElementById('announcements-list');
+      let items = allAnnouncements;
+
+      if (activeFilter === 'active') {
+        items = items.filter(a => a.is_active !== false);
+      } else if (activeFilter !== 'all') {
+        items = items.filter(a => a.priority === activeFilter);
+      }
+
+      if (!items.length) {
+        listEl.innerHTML = `<div class="empty-state" style="text-align:center;padding:var(--space-10);">
+          <i data-lucide="bell-off" style="width:40px;height:40px;color:var(--color-text-subtle);"></i>
+          <p style="color:var(--color-text-muted);margin-top:var(--space-3);">No announcements match this filter.</p>
+        </div>`;
+        initIcons();
+        return;
+      }
+
+      listEl.innerHTML = items.map(a => `
+        <div class="ann-card priority-${escHtml(a.priority || 'normal')} ${a.is_active === false ? 'ann-inactive' : ''}">
+          <div class="ann-card-header">
+            <div>
+              <div style="display:flex;align-items:center;gap:var(--space-2);margin-bottom:var(--space-1);">
+                <span class="badge badge-${a.priority === 'urgent' ? 'danger' : a.priority === 'high' ? 'warning' : 'info'}">
+                  ${escHtml(a.priority || 'normal')}
+                </span>
+                ${a.is_active === false
+                  ? '<span class="badge" style="background:var(--color-surface-subtle);color:var(--color-text-subtle);">Hidden</span>'
+                  : '<span class="badge" style="background:#d1fae5;color:#065f46;">Active</span>'}
+              </div>
+              <div class="ann-title">${escHtml(a.title)}</div>
+            </div>
+          </div>
+          <div class="ann-meta">
+            <i data-lucide="calendar" style="width:11px;height:11px;display:inline;"></i>
+            Posted: ${fmtDate(a.created_at)}
+            ${a.expires_at ? ` &nbsp;·&nbsp; <i data-lucide="clock" style="width:11px;height:11px;display:inline;"></i> Expires: ${fmtDate(a.expires_at)}` : ''}
+          </div>
+          <div class="ann-body">${escHtml(a.body || '')}</div>
+          <div class="ann-actions">
+            <button class="btn btn-outline btn-sm" data-edit="${a.id}">
+              <i data-lucide="pencil" style="width:13px;height:13px;"></i> Edit
+            </button>
+            ${a.is_active !== false ? `
+            <button class="btn btn-sm" style="border:1px solid var(--color-danger);color:var(--color-danger);background:none;"
+              data-delete="${a.id}" data-title="${escHtml(a.title)}">
+              <i data-lucide="eye-off" style="width:13px;height:13px;"></i> Deactivate
+            </button>` : `
+            <button class="btn btn-sm" style="border:1px solid var(--color-success);color:var(--color-success);background:none;"
+              data-reactivate="${a.id}">
+              <i data-lucide="eye" style="width:13px;height:13px;"></i> Re-activate
+            </button>`}
+          </div>
+        </div>`).join('');
+
+      initIcons();
+
+      // Edit
+      listEl.querySelectorAll('[data-edit]').forEach(btn => {
+        btn.addEventListener('click', () => openEditModal(btn.dataset.edit));
+      });
+      // Deactivate
+      listEl.querySelectorAll('[data-delete]').forEach(btn => {
+        btn.addEventListener('click', () => openDeleteModal(btn.dataset.delete, btn.dataset.title));
+      });
+      // Re-activate
+      listEl.querySelectorAll('[data-reactivate]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          try {
+            await ApiClient.updateAnnouncement(btn.dataset.reactivate, { is_active: true });
+            showToast('Announcement re-activated.', 'success');
+            await loadAnnouncements();
+          } catch (err) {
+            showToast('Could not re-activate: ' + err.message, 'error');
+          }
+        });
+      });
+    }
+
+    // ── Modal helpers ─────────────────────────────────────────
+    function openAddModal() {
+      document.getElementById('ann-modal-title').textContent = 'Post New Announcement';
+      document.getElementById('ann-form').reset();
+      document.getElementById('ann-id').value = '';
+      document.getElementById('ann-active').checked = true;
+      document.getElementById('ann-priority').value = 'normal';
+      document.getElementById('ann-submit-btn').innerHTML =
+        '<i data-lucide="send" style="width:14px;height:14px;"></i> Publish';
+      document.getElementById('ann-form-error').style.display = 'none';
+      document.getElementById('ann-modal').classList.add('open');
+      document.body.style.overflow = 'hidden';
+      initIcons();
+    }
+
+    function openEditModal(id) {
+      const ann = allAnnouncements.find(a => String(a.id) === String(id));
+      if (!ann) return;
+      document.getElementById('ann-modal-title').textContent = 'Edit Announcement';
+      document.getElementById('ann-id').value = ann.id;
+      document.getElementById('ann-title').value = ann.title || '';
+      document.getElementById('ann-body').value = ann.body || '';
+      document.getElementById('ann-priority').value = ann.priority || 'normal';
+      document.getElementById('ann-active').checked = ann.is_active !== false;
+      document.getElementById('ann-expires').value = ann.expires_at
+        ? ann.expires_at.split('T')[0] : '';
+      document.getElementById('ann-submit-btn').innerHTML =
+        '<i data-lucide="save" style="width:14px;height:14px;"></i> Save Changes';
+      document.getElementById('ann-form-error').style.display = 'none';
+      document.getElementById('ann-modal').classList.add('open');
+      document.body.style.overflow = 'hidden';
+      initIcons();
+    }
+
+    function openDeleteModal(id, title) {
+      deleteTarget = id;
+      document.getElementById('delete-ann-title').textContent = title;
+      document.getElementById('delete-error').style.display = 'none';
+      document.getElementById('delete-modal').classList.add('open');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeModal(id) {
+      document.getElementById(id).classList.remove('open');
+      document.body.style.overflow = '';
+    }
+
+    // ── Form submit ───────────────────────────────────────────
+    document.getElementById('ann-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const errorEl = document.getElementById('ann-form-error');
+      errorEl.style.display = 'none';
+
+      const id = document.getElementById('ann-id').value;
+      const title = document.getElementById('ann-title').value.trim();
+      const body  = document.getElementById('ann-body').value.trim();
+
+      if (!title) { errorEl.textContent = 'Title is required.'; errorEl.style.display = ''; return; }
+      if (!body)  { errorEl.textContent = 'Message body is required.'; errorEl.style.display = ''; return; }
+
+      const expiresRaw = document.getElementById('ann-expires').value;
+      const payload = {
+        title,
+        body,
+        priority: document.getElementById('ann-priority').value,
+        is_active: document.getElementById('ann-active').checked,
+        expires_at: expiresRaw ? new Date(expiresRaw).toISOString() : undefined
+      };
+
+      const btn = document.getElementById('ann-submit-btn');
+      btn.disabled = true;
+      const origHtml = btn.innerHTML;
+      btn.innerHTML = 'Saving…';
+
+      try {
+        if (id) {
+          await ApiClient.updateAnnouncement(id, payload);
+          showToast('Announcement updated.', 'success');
+        } else {
+          await ApiClient.createAnnouncement(payload);
+          showToast('Announcement published.', 'success');
+        }
+        closeModal('ann-modal');
+        await loadAnnouncements();
+      } catch (err) {
+        errorEl.textContent = err.message || 'Could not save announcement. Please try again.';
+        errorEl.style.display = '';
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = origHtml;
+        initIcons();
+      }
+    });
+
+    // ── Delete confirm ────────────────────────────────────────
+    document.getElementById('delete-confirm-btn').addEventListener('click', async () => {
+      if (!deleteTarget) return;
+      const btn = document.getElementById('delete-confirm-btn');
+      const errorEl = document.getElementById('delete-error');
+      btn.disabled = true; btn.textContent = 'Deactivating…';
+      try {
+        await ApiClient.updateAnnouncement(deleteTarget, { is_active: false });
+        showToast('Announcement deactivated.', 'success');
+        closeModal('delete-modal');
+        await loadAnnouncements();
+      } catch (err) {
+        errorEl.textContent = err.message || 'Could not deactivate.';
+        errorEl.style.display = '';
+      } finally {
+        btn.disabled = false; btn.textContent = 'Deactivate';
+      }
+    });
+
+    // ── Filter chips ──────────────────────────────────────────
+    document.getElementById('filter-bar').addEventListener('click', (e) => {
+      const chip = e.target.closest('[data-filter]');
+      if (!chip) return;
+      document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      activeFilter = chip.dataset.filter;
+      renderList();
+    });
+
+    // ── Wire up close handlers ────────────────────────────────
+    document.getElementById('add-ann-btn').addEventListener('click', openAddModal);
+    document.getElementById('ann-modal-close').addEventListener('click', () => closeModal('ann-modal'));
+    document.getElementById('ann-cancel-btn').addEventListener('click', () => closeModal('ann-modal'));
+    document.getElementById('delete-cancel-btn').addEventListener('click', () => closeModal('delete-modal'));
+    document.getElementById('ann-modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeModal('ann-modal'); });
+    document.getElementById('delete-modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeModal('delete-modal'); });
+
+    // ── Helpers ───────────────────────────────────────────────
+    function fmtDate(iso) {
+      if (!iso) return '';
+      return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+    }
+
+    function escHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    loadAnnouncements();
+    initIcons();
+  </script>
+</body>
+</html>
+

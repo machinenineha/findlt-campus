@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sign In — RouteReady Campus</title>
+  <meta name="description" content="Sign in to your RouteReady Campus account to access transport services." />
+  <link rel="stylesheet" href="/css/base.css" />
+  <link rel="stylesheet" href="/css/layout.css" />
+  <link rel="stylesheet" href="/css/components.css" />
+  <link rel="stylesheet" href="/css/pages.css" />
+  <link rel="stylesheet" href="/css/responsive.css" />
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" defer></script>
+  <style>
+    .auth-page {
+      min-height: calc(100vh - 4.25rem);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: var(--space-8) var(--space-4);
+      background: linear-gradient(135deg, var(--color-primary-soft) 0%, var(--color-accent-soft) 100%);
+    }
+    .auth-card {
+      width: 100%;
+      max-width: 440px;
+      background: var(--color-surface);
+      border-radius: var(--radius-xl);
+      box-shadow: var(--shadow-xl);
+      overflow: hidden;
+    }
+    .auth-card-header {
+      background: var(--color-primary);
+      padding: var(--space-8) var(--space-8) var(--space-6);
+      color: white;
+      text-align: center;
+    }
+    .auth-card-header .brand {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-2);
+      font-size: var(--font-size-xl);
+      font-weight: 700;
+      margin-bottom: var(--space-2);
+    }
+    .auth-card-header p {
+      font-size: var(--font-size-sm);
+      opacity: 0.85;
+    }
+    .auth-card-body {
+      padding: var(--space-8);
+    }
+    .auth-tabs {
+      display: flex;
+      gap: var(--space-1);
+      background: var(--color-surface-subtle);
+      border-radius: var(--radius-md);
+      padding: 3px;
+      margin-bottom: var(--space-6);
+    }
+    .auth-tab {
+      flex: 1;
+      padding: var(--space-2) var(--space-4);
+      border: none;
+      background: transparent;
+      border-radius: calc(var(--radius-md) - 2px);
+      font-size: var(--font-size-sm);
+      font-weight: 500;
+      color: var(--color-text-muted);
+      cursor: pointer;
+      transition: var(--transition);
+    }
+    .auth-tab.active {
+      background: var(--color-surface);
+      color: var(--color-primary);
+      font-weight: 600;
+      box-shadow: var(--shadow-sm);
+    }
+    .auth-panel { display: none; }
+    .auth-panel.active { display: block; }
+    .auth-demo-hint {
+      margin-top: var(--space-6);
+      padding: var(--space-4);
+      background: var(--color-surface-subtle);
+      border-radius: var(--radius-md);
+      border: 1px solid var(--color-border);
+      font-size: var(--font-size-xs);
+      color: var(--color-text-muted);
+    }
+    .auth-demo-hint strong { color: var(--color-text-main); }
+    .auth-demo-hint code {
+      background: white;
+      padding: 1px 4px;
+      border-radius: 3px;
+      font-size: 11px;
+      font-family: monospace;
+    }
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      margin: var(--space-4) 0;
+      color: var(--color-text-subtle);
+      font-size: var(--font-size-xs);
+    }
+    .divider::before, .divider::after {
+      content: '';
+      flex: 1;
+      border-top: 1px solid var(--color-border);
+    }
+    .forgot-link {
+      font-size: var(--font-size-xs);
+      color: var(--color-primary);
+    }
+    .form-footer-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--space-4);
+    }
+    #recovery-panel { display:none; }
+    #recovery-panel.active { display:block; }
+  </style>
+</head>
+<body>
+  <header class="site-header" id="site-header"></header>
+
+  <div class="auth-page">
+    <div class="auth-card">
+      <div class="auth-card-header">
+        <div class="brand">
+          <i data-lucide="bus" style="width:26px;height:26px;"></i>
+          RouteReady Campus
+        </div>
+        <p>Apex Institute of Technology — Transport Portal</p>
+      </div>
+      <div class="auth-card-body">
+
+        <!-- Auth tabs -->
+        <div class="auth-tabs" role="tablist" id="auth-tabs">
+          <button class="auth-tab active" data-tab="signin" role="tab" aria-selected="true">Sign In</button>
+          <button class="auth-tab" data-tab="signup" role="tab" aria-selected="false">Create Account</button>
+        </div>
+
+        <!-- Sign In Panel -->
+        <div class="auth-panel active" id="panel-signin">
+          <form id="signin-form" novalidate>
+            <div class="form-group">
+              <label class="form-label" for="signin-email">Email Address</label>
+              <input type="email" id="signin-email" class="form-input" placeholder="you@apex.edu.in" autocomplete="email" required />
+            </div>
+            <div class="form-group">
+              <div class="form-footer-row">
+                <label class="form-label" for="signin-password" style="margin:0;">Password</label>
+                <button type="button" class="forgot-link" id="forgot-btn">Forgot password?</button>
+              </div>
+              <input type="password" id="signin-password" class="form-input" placeholder="••••••••" autocomplete="current-password" required />
+            </div>
+            <div id="signin-error" class="form-error" style="display:none;"></div>
+            <button type="submit" class="btn btn-primary btn-block" id="signin-btn">
+              <i data-lucide="log-in" style="width:16px;height:16px;"></i>
+              Sign In
+            </button>
+          </form>
+
+          <div class="auth-demo-hint">
+            <strong>Demo Credentials</strong><br />
+            Student: any email + any password<br />
+            Admin: any email containing <code>admin</code> — or — password <code>AdminPassword123!</code>
+          </div>
+        </div>
+
+        <!-- Sign Up Panel -->
+        <div class="auth-panel" id="panel-signup">
+          <form id="signup-form" novalidate>
+            <div class="form-group">
+              <label class="form-label" for="signup-name">Full Name</label>
+              <input type="text" id="signup-name" class="form-input" placeholder="Priya Sharma" autocomplete="name" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="signup-email">College Email Address</label>
+              <input type="email" id="signup-email" class="form-input" placeholder="you@apex.edu.in" autocomplete="email" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="signup-password">Password <span class="form-hint">(min. 8 characters)</span></label>
+              <input type="password" id="signup-password" class="form-input" placeholder="Choose a strong password" autocomplete="new-password" required minlength="8" />
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="signup-confirm">Confirm Password</label>
+              <input type="password" id="signup-confirm" class="form-input" placeholder="Repeat password" autocomplete="new-password" required />
+            </div>
+            <div id="signup-error" class="form-error" style="display:none;"></div>
+            <div id="signup-success" class="form-success" style="display:none;"></div>
+            <button type="submit" class="btn btn-primary btn-block" id="signup-btn">
+              <i data-lucide="user-plus" style="width:16px;height:16px;"></i>
+              Create Account
+            </button>
+          </form>
+        </div>
+
+        <!-- Password Recovery Panel -->
+        <div id="recovery-panel">
+          <p class="text-muted text-sm" style="margin-bottom:var(--space-4);">
+            Enter your registered email address. If your account exists, we'll send a password reset link.
+          </p>
+          <form id="recovery-form" novalidate>
+            <div class="form-group">
+              <label class="form-label" for="recovery-email">Email Address</label>
+              <input type="email" id="recovery-email" class="form-input" placeholder="you@apex.edu.in" autocomplete="email" required />
+            </div>
+            <div id="recovery-error" class="form-error" style="display:none;"></div>
+            <div id="recovery-success" class="form-success" style="display:none;"></div>
+            <div style="display:flex;gap:var(--space-3);">
+              <button type="button" class="btn btn-outline btn-sm" id="recovery-back">Back</button>
+              <button type="submit" class="btn btn-primary" style="flex:1;" id="recovery-btn">Send Reset Link</button>
+            </div>
+          </form>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <div id="toast-container"></div>
+
+  <script type="module">
+    import { renderHeader } from '/js/navigation.js';
+    import { auth } from '/js/auth.js';
+    import { showToast, initIcons } from '/js/components/ui.js';
+
+    renderHeader();
+
+    // Redirect if already signed in
+    if (auth.isLoggedIn()) {
+      window.location.href = auth.isAdmin() ? '/admin/index.html' : '/dashboard.html';
+    }
+
+    // Check for password recovery mode from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('type') === 'recovery') {
+      document.getElementById('recovery-panel').classList.add('active');
+      document.getElementById('auth-tabs').style.display = 'none';
+      document.getElementById('panel-signin').classList.remove('active');
+    }
+
+    // Tab switching
+    document.getElementById('auth-tabs').addEventListener('click', (e) => {
+      const tab = e.target.closest('[data-tab]');
+      if (!tab) return;
+      document.querySelectorAll('.auth-tab').forEach(t => { t.classList.remove('active'); t.setAttribute('aria-selected', 'false'); });
+      document.querySelectorAll('.auth-panel').forEach(p => p.classList.remove('active'));
+      tab.classList.add('active');
+      tab.setAttribute('aria-selected', 'true');
+      document.getElementById(`panel-${tab.dataset.tab}`).classList.add('active');
+    });
+
+    // Forgot password toggle
+    document.getElementById('forgot-btn').addEventListener('click', () => {
+      document.getElementById('auth-tabs').style.display = 'none';
+      document.getElementById('panel-signin').style.display = 'none';
+      document.getElementById('recovery-panel').classList.add('active');
+    });
+    document.getElementById('recovery-back').addEventListener('click', () => {
+      document.getElementById('auth-tabs').style.display = '';
+      document.getElementById('panel-signin').style.display = '';
+      document.getElementById('recovery-panel').classList.remove('active');
+    });
+
+    function setLoading(btnId, loading) {
+      const btn = document.getElementById(btnId);
+      btn.disabled = loading;
+      btn.style.opacity = loading ? '0.7' : '1';
+    }
+
+    function showError(elId, msg) {
+      const el = document.getElementById(elId);
+      el.textContent = msg;
+      el.style.display = msg ? '' : 'none';
+    }
+
+    // Sign In
+    document.getElementById('signin-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      showError('signin-error', '');
+      const email = document.getElementById('signin-email').value.trim();
+      const password = document.getElementById('signin-password').value;
+      if (!email || !password) { showError('signin-error', 'Please enter your email and password.'); return; }
+      setLoading('signin-btn', true);
+      try {
+        const session = await auth.signIn(email, password);
+        showToast('Signed in successfully!', 'success');
+        setTimeout(() => {
+          window.location.href = session.user.role === 'admin' ? '/admin/index.html' : '/dashboard.html';
+        }, 600);
+      } catch (err) {
+        showError('signin-error', err.message || 'Invalid credentials. Please try again.');
+      } finally {
+        setLoading('signin-btn', false);
+      }
+    });
+
+    // Sign Up
+    document.getElementById('signup-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      showError('signup-error', '');
+      document.getElementById('signup-success').style.display = 'none';
+      const name = document.getElementById('signup-name').value.trim();
+      const email = document.getElementById('signup-email').value.trim();
+      const password = document.getElementById('signup-password').value;
+      const confirm = document.getElementById('signup-confirm').value;
+      if (!name || !email || !password) { showError('signup-error', 'All fields are required.'); return; }
+      if (password.length < 8) { showError('signup-error', 'Password must be at least 8 characters.'); return; }
+      if (password !== confirm) { showError('signup-error', 'Passwords do not match.'); return; }
+      setLoading('signup-btn', true);
+      try {
+        await auth.signUp(email, password, name);
+        const successEl = document.getElementById('signup-success');
+        successEl.textContent = 'Account created! Check your college email inbox to confirm your address, then sign in.';
+        successEl.style.display = '';
+        document.getElementById('signup-form').reset();
+      } catch (err) {
+        showError('signup-error', err.message || 'Could not create account. Please try again.');
+      } finally {
+        setLoading('signup-btn', false);
+      }
+    });
+
+    // Password Recovery
+    document.getElementById('recovery-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      showError('recovery-error', '');
+      document.getElementById('recovery-success').style.display = 'none';
+      const email = document.getElementById('recovery-email').value.trim();
+      if (!email) { showError('recovery-error', 'Please enter your email address.'); return; }
+      setLoading('recovery-btn', true);
+      try {
+        await auth.resetPassword(email);
+        const successEl = document.getElementById('recovery-success');
+        successEl.textContent = 'If this email is registered, a reset link has been sent. Check your inbox.';
+        successEl.style.display = '';
+      } catch (err) {
+        showError('recovery-error', err.message || 'Could not send reset link. Please try again.');
+      } finally {
+        setLoading('recovery-btn', false);
+      }
+    });
+
+    initIcons();
+  </script>
+</body>
+</html>
+

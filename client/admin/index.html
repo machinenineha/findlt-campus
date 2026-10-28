@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Dashboard — RouteReady Campus</title>
+  <meta name="description" content="Transport administrator dashboard for RouteReady Campus." />
+  <link rel="stylesheet" href="/css/base.css" />
+  <link rel="stylesheet" href="/css/layout.css" />
+  <link rel="stylesheet" href="/css/components.css" />
+  <link rel="stylesheet" href="/css/pages.css" />
+  <link rel="stylesheet" href="/css/responsive.css" />
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" defer></script>
+  <style>
+    .admin-page-header {
+      background: var(--color-primary-dark);
+      color: white;
+      padding: var(--space-6) 0;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+    .admin-page-header-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .admin-page-header h1 {
+      font-size: var(--font-size-xl);
+      font-weight: 700;
+    }
+    .admin-page-header p {
+      font-size: var(--font-size-sm);
+      opacity: 0.7;
+      margin-top: 2px;
+    }
+    .admin-badge {
+      background: var(--color-accent);
+      color: white;
+      font-size: var(--font-size-xs);
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: var(--radius-full);
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: var(--space-4);
+      margin-bottom: var(--space-6);
+    }
+    .kpi-card {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-xl);
+      padding: var(--space-5);
+      display: flex;
+      align-items: flex-start;
+      gap: var(--space-4);
+      transition: var(--transition);
+    }
+    .kpi-card:hover { box-shadow: var(--shadow-md); }
+    .kpi-icon-wrap {
+      width: 48px;
+      height: 48px;
+      border-radius: var(--radius-lg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .kpi-value {
+      font-size: var(--font-size-3xl);
+      font-weight: 800;
+      color: var(--color-text-main);
+      line-height: 1;
+    }
+    .kpi-label {
+      font-size: var(--font-size-sm);
+      color: var(--color-text-muted);
+      margin-top: var(--space-1);
+    }
+    .kpi-sub {
+      font-size: var(--font-size-xs);
+      color: var(--color-text-subtle);
+      margin-top: var(--space-1);
+    }
+    .admin-grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-5);
+      margin-bottom: var(--space-5);
+    }
+    .admin-panel {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-xl);
+      overflow: hidden;
+    }
+    .admin-panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--space-4) var(--space-6);
+      border-bottom: 1px solid var(--color-border);
+      background: var(--color-surface-subtle);
+    }
+    .admin-panel-header h3 {
+      font-size: var(--font-size-base);
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+    }
+    .admin-panel-body { padding: var(--space-4) var(--space-6); }
+    .admin-quick-action {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      padding: var(--space-3) var(--space-4);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      margin-bottom: var(--space-3);
+      text-decoration: none;
+      color: var(--color-text-main);
+      font-size: var(--font-size-sm);
+      font-weight: 500;
+      transition: var(--transition);
+    }
+    .admin-quick-action:hover {
+      background: var(--color-primary-soft);
+      border-color: var(--color-primary);
+      color: var(--color-primary);
+    }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .status-dot.active { background: var(--color-success); }
+    .status-dot.inactive { background: var(--color-text-subtle); }
+    @media (max-width: 1100px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 900px) {
+      .admin-grid-2 { grid-template-columns: 1fr; }
+      .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 500px) { .kpi-grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <header class="site-header" id="site-header"></header>
+
+  <div class="admin-page-header">
+    <div class="container admin-page-header-inner">
+      <div>
+        <h1>
+          <i data-lucide="layout-dashboard" style="width:20px;height:20px;display:inline;vertical-align:text-bottom;margin-right:6px;"></i>
+          Admin Dashboard
+        </h1>
+        <p id="admin-welcome">Transport Management — Apex Institute of Technology</p>
+      </div>
+      <span class="admin-badge">Admin</span>
+    </div>
+  </div>
+
+  <div class="admin-layout">
+    <!-- Sidebar -->
+    <nav class="admin-sidebar" aria-label="Admin navigation">
+      <div style="font-size:var(--font-size-xs);font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--color-text-subtle);margin-bottom:var(--space-2);padding:0 var(--space-4);">Management</div>
+      <div class="admin-sidebar-nav">
+        <a href="/admin/index.html" class="admin-nav-item active">
+          <i data-lucide="layout-dashboard" style="width:16px;height:16px;"></i> Dashboard
+        </a>
+        <a href="/admin/buses.html" class="admin-nav-item">
+          <i data-lucide="bus-front" style="width:16px;height:16px;"></i> Buses
+        </a>
+        <a href="/admin/routes.html" class="admin-nav-item">
+          <i data-lucide="route" style="width:16px;height:16px;"></i> Routes &amp; Stops
+        </a>
+        <a href="/admin/announcements.html" class="admin-nav-item">
+          <i data-lucide="megaphone" style="width:16px;height:16px;"></i> Announcements
+        </a>
+      </div>
+      <div style="margin-top:var(--space-6);font-size:var(--font-size-xs);font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--color-text-subtle);margin-bottom:var(--space-2);padding:0 var(--space-4);">Student Portal</div>
+      <div class="admin-sidebar-nav">
+        <a href="/index.html" class="admin-nav-item">
+          <i data-lucide="home" style="width:16px;height:16px;"></i> Home
+        </a>
+        <a href="/routes.html" class="admin-nav-item">
+          <i data-lucide="map" style="width:16px;height:16px;"></i> Route Map
+        </a>
+        <a href="/timetables.html" class="admin-nav-item">
+          <i data-lucide="clock" style="width:16px;height:16px;"></i> Timetables
+        </a>
+      </div>
+      <div style="margin-top:auto;padding-top:var(--space-6);">
+        <button id="admin-signout-btn" class="btn btn-outline btn-sm btn-block">
+          <i data-lucide="log-out" style="width:14px;height:14px;"></i> Sign Out
+        </button>
+      </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="admin-content">
+
+      <!-- KPI Cards -->
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-icon-wrap" style="background:#eff6ff;">
+            <i data-lucide="bus-front" style="width:24px;height:24px;color:var(--color-primary);"></i>
+          </div>
+          <div>
+            <div class="kpi-value" id="kpi-buses">—</div>
+            <div class="kpi-label">Active Buses</div>
+            <div class="kpi-sub" id="kpi-buses-sub">Loading…</div>
+          </div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon-wrap" style="background:#f0fdfa;">
+            <i data-lucide="route" style="width:24px;height:24px;color:var(--color-accent);"></i>
+          </div>
+          <div>
+            <div class="kpi-value" id="kpi-routes">—</div>
+            <div class="kpi-label">Routes</div>
+            <div class="kpi-sub" id="kpi-routes-sub">Loading…</div>
+          </div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon-wrap" style="background:#fef3c7;">
+            <i data-lucide="map-pin" style="width:24px;height:24px;color:#d97706;"></i>
+          </div>
+          <div>
+            <div class="kpi-value" id="kpi-stops">—</div>
+            <div class="kpi-label">Bus Stops</div>
+            <div class="kpi-sub" id="kpi-stops-sub">Loading…</div>
+          </div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon-wrap" style="background:#fce7f3;">
+            <i data-lucide="megaphone" style="width:24px;height:24px;color:#db2777;"></i>
+          </div>
+          <div>
+            <div class="kpi-value" id="kpi-announcements">—</div>
+            <div class="kpi-label">Announcements</div>
+            <div class="kpi-sub" id="kpi-ann-sub">Loading…</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="admin-grid-2">
+
+        <!-- Quick Actions -->
+        <div class="admin-panel">
+          <div class="admin-panel-header">
+            <h3><i data-lucide="zap" style="width:16px;height:16px;color:var(--color-accent);"></i> Quick Actions</h3>
+          </div>
+          <div class="admin-panel-body">
+            <a href="/admin/buses.html" class="admin-quick-action">
+              <i data-lucide="plus-circle" style="width:18px;height:18px;color:var(--color-primary);"></i>
+              Add or Manage Buses
+            </a>
+            <a href="/admin/routes.html" class="admin-quick-action">
+              <i data-lucide="plus-circle" style="width:18px;height:18px;color:var(--color-accent);"></i>
+              Manage Routes &amp; Stops
+            </a>
+            <a href="/admin/announcements.html" class="admin-quick-action">
+              <i data-lucide="send" style="width:18px;height:18px;color:#db2777;"></i>
+              Post an Announcement
+            </a>
+            <a href="/timetables.html" class="admin-quick-action" target="_blank">
+              <i data-lucide="external-link" style="width:18px;height:18px;color:var(--color-text-muted);"></i>
+              Preview Student Timetables
+            </a>
+          </div>
+        </div>
+
+        <!-- Recent Activity / Announcements -->
+        <div class="admin-panel">
+          <div class="admin-panel-header">
+            <h3><i data-lucide="bell" style="width:16px;height:16px;color:#db2777;"></i> Recent Announcements</h3>
+            <a href="/admin/announcements.html" class="btn btn-outline btn-sm">Manage</a>
+          </div>
+          <div class="admin-panel-body" id="admin-recent-ann">
+            <div class="loading-state" style="font-size:var(--font-size-sm);">
+              <i data-lucide="loader-circle" class="spin" style="width:16px;height:16px;"></i> Loading…
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Bus Fleet Overview -->
+      <div class="admin-panel" style="margin-bottom:var(--space-5);">
+        <div class="admin-panel-header">
+          <h3><i data-lucide="bus-front" style="width:16px;height:16px;color:var(--color-primary);"></i> Bus Fleet Overview</h3>
+          <a href="/admin/buses.html" class="btn btn-primary btn-sm">Manage Buses</a>
+        </div>
+        <div class="admin-panel-body">
+          <div style="overflow-x:auto;">
+            <table class="data-table" id="admin-buses-table">
+              <thead>
+                <tr>
+                  <th>Bus Number</th>
+                  <th>Capacity</th>
+                  <th>Driver</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="admin-buses-tbody">
+                <tr><td colspan="4" style="text-align:center;color:var(--color-text-subtle);">
+                  <i data-lucide="loader-circle" class="spin" style="width:14px;height:14px;"></i> Loading…
+                </td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Data Notice -->
+      <div class="notice-banner notice-banner-info" style="margin-bottom:var(--space-5);">
+        <i data-lucide="info" style="width:16px;height:16px;flex-shrink:0;"></i>
+        <div style="font-size:var(--font-size-sm);">
+          <strong>Demo Data Mode:</strong> The system is running with demonstration data.
+          Apply the SQL migrations in Supabase and add your
+          <code>SUPABASE_SERVICE_ROLE_KEY</code> to the server <code>.env</code> to switch to live data.
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <div id="toast-container"></div>
+
+  <script type="module">
+    import { renderHeader } from '/js/navigation.js';
+    import { auth } from '/js/auth.js';
+    import { ApiClient } from '/js/api.js';
+    import { showToast, initIcons } from '/js/components/ui.js';
+
+    renderHeader();
+
+    // Guard: admin only
+    if (!auth.requireAdmin('/dashboard.html')) { /* redirected */ }
+
+    const user = auth.getUser();
+    if (user) {
+      document.getElementById('admin-welcome').textContent =
+        `Signed in as ${user.full_name || user.email} · Transport Admin`;
+    }
+
+    document.getElementById('admin-signout-btn').addEventListener('click', () => auth.signOut());
+
+    async function loadDashboard() {
+      try {
+        const data = await ApiClient.getAdminDashboard();
+        const d = data?.data || {};
+        document.getElementById('kpi-buses').textContent = d.active_buses ?? '—';
+        document.getElementById('kpi-buses-sub').textContent = 'in service';
+        document.getElementById('kpi-routes').textContent = d.active_routes ?? '—';
+        document.getElementById('kpi-routes-sub').textContent = 'scheduled routes';
+        document.getElementById('kpi-stops').textContent = d.total_stops ?? '—';
+        document.getElementById('kpi-stops-sub').textContent = 'stop locations';
+        document.getElementById('kpi-announcements').textContent = d.active_announcements ?? '—';
+        document.getElementById('kpi-ann-sub').textContent = 'active notices';
+      } catch (err) {
+        showToast('Could not load dashboard stats: ' + err.message, 'error');
+      }
+    }
+
+    async function loadBuses() {
+      const tbody = document.getElementById('admin-buses-tbody');
+      try {
+        const data = await ApiClient.getBuses();
+        const buses = data?.data || [];
+        if (!buses.length) {
+          tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--color-text-subtle);">No buses found.</td></tr>';
+          return;
+        }
+        tbody.innerHTML = buses.map(b => `
+          <tr>
+            <td><strong>${escHtml(b.bus_number || b.plate_number || '—')}</strong></td>
+            <td>${escHtml(String(b.capacity || '—'))}</td>
+            <td>${escHtml(b.driver_name || '—')}</td>
+            <td>
+              <div style="display:flex;align-items:center;gap:6px;">
+                <div class="status-dot ${b.is_active !== false ? 'active' : 'inactive'}"></div>
+                ${b.is_active !== false ? 'Active' : 'Inactive'}
+              </div>
+            </td>
+          </tr>`).join('');
+      } catch {
+        tbody.innerHTML = '<tr><td colspan="4" style="color:var(--color-danger);text-align:center;">Could not load buses.</td></tr>';
+      }
+    }
+
+    async function loadRecentAnnouncements() {
+      const el = document.getElementById('admin-recent-ann');
+      try {
+        const data = await ApiClient.getAllAdminAnnouncements();
+        const items = (data?.data || []).slice(0, 3);
+        if (!items.length) { el.innerHTML = '<p class="text-sm text-muted">No announcements.</p>'; return; }
+        el.innerHTML = items.map(a => `
+          <div style="display:flex;align-items:center;gap:var(--space-3);padding:var(--space-2) 0;border-bottom:1px solid var(--color-border);">
+            <span class="badge badge-${a.priority === 'urgent' ? 'danger' : a.priority === 'high' ? 'warning' : 'info'}">${escHtml(a.priority || 'info')}</span>
+            <span style="font-size:var(--font-size-sm);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(a.title)}</span>
+          </div>`).join('');
+      } catch { el.innerHTML = '<p class="text-sm" style="color:var(--color-danger);">Could not load.</p>'; }
+    }
+
+    function escHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    loadDashboard();
+    loadBuses();
+    loadRecentAnnouncements();
+    initIcons();
+  </script>
+</body>
+</html>
+

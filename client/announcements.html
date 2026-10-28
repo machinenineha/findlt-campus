@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Transport Announcements — RouteReady Campus</title>
+  <meta name="description" content="Latest transport notices, route changes, and alerts from the Apex Institute transport office." />
+  <link rel="stylesheet" href="/css/base.css" />
+  <link rel="stylesheet" href="/css/layout.css" />
+  <link rel="stylesheet" href="/css/components.css" />
+  <link rel="stylesheet" href="/css/pages.css" />
+  <link rel="stylesheet" href="/css/responsive.css" />
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" defer></script>
+  <style>
+    .announcements-header {
+      background: var(--color-primary);
+      color: white;
+      padding: var(--space-10) 0 var(--space-8);
+    }
+    .announcements-header h1 { font-size: var(--font-size-3xl); font-weight: 800; margin-bottom: var(--space-2); }
+    .announcements-header p { opacity: 0.85; }
+    .announcements-layout {
+      display: grid;
+      grid-template-columns: 1fr 280px;
+      gap: var(--space-8);
+      padding: var(--space-8) 0 var(--space-12);
+    }
+    .announcement-card {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-xl);
+      padding: var(--space-6);
+      margin-bottom: var(--space-4);
+      transition: var(--transition);
+      position: relative;
+    }
+    .announcement-card:hover {
+      box-shadow: var(--shadow-md);
+    }
+    .announcement-card.priority-urgent {
+      border-left: 4px solid var(--color-danger);
+    }
+    .announcement-card.priority-high {
+      border-left: 4px solid var(--color-warning);
+    }
+    .announcement-card.priority-normal {
+      border-left: 4px solid var(--color-info);
+    }
+    .announcement-card-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: var(--space-3);
+      margin-bottom: var(--space-3);
+    }
+    .announcement-title {
+      font-size: var(--font-size-lg);
+      font-weight: 700;
+      color: var(--color-text-main);
+      line-height: 1.3;
+    }
+    .announcement-meta {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      margin-bottom: var(--space-3);
+      font-size: var(--font-size-xs);
+      color: var(--color-text-subtle);
+      flex-wrap: wrap;
+    }
+    .announcement-body {
+      font-size: var(--font-size-sm);
+      color: var(--color-text-muted);
+      line-height: 1.7;
+      white-space: pre-line;
+    }
+    .announcement-sidebar-card {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-xl);
+      padding: var(--space-5);
+      margin-bottom: var(--space-5);
+    }
+    .announcement-sidebar-card h3 {
+      font-size: var(--font-size-sm);
+      font-weight: 700;
+      color: var(--color-text-main);
+      margin-bottom: var(--space-4);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--color-text-muted);
+    }
+    .priority-legend-item {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      padding: var(--space-2) 0;
+      font-size: var(--font-size-sm);
+      color: var(--color-text-muted);
+    }
+    .priority-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .filter-chip-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-2);
+      margin-bottom: var(--space-5);
+    }
+    .filter-chip {
+      padding: var(--space-1) var(--space-3);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-full);
+      font-size: var(--font-size-xs);
+      font-weight: 500;
+      color: var(--color-text-muted);
+      background: var(--color-surface);
+      cursor: pointer;
+      transition: var(--transition);
+    }
+    .filter-chip.active {
+      background: var(--color-primary);
+      color: white;
+      border-color: var(--color-primary);
+    }
+    @media (max-width: 900px) {
+      .announcements-layout { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header class="site-header" id="site-header"></header>
+
+  <div class="announcements-header">
+    <div class="container">
+      <h1>
+        <i data-lucide="megaphone" style="width:32px;height:32px;display:inline;vertical-align:text-bottom;"></i>
+        Transport Announcements
+      </h1>
+      <p>Route changes, schedule updates, alerts, and notices from the Transport Office.</p>
+    </div>
+  </div>
+
+  <main class="container">
+    <div class="announcements-layout">
+
+      <!-- Main Feed -->
+      <div>
+        <div class="filter-chip-group" id="filter-chips">
+          <button class="filter-chip active" data-filter="all">All</button>
+          <button class="filter-chip" data-filter="urgent">Urgent</button>
+          <button class="filter-chip" data-filter="high">High Priority</button>
+          <button class="filter-chip" data-filter="normal">Normal</button>
+        </div>
+
+        <div id="announcements-feed">
+          <div class="loading-state" style="text-align:center;padding:var(--space-10);">
+            <i data-lucide="loader-circle" class="spin" style="width:26px;height:26px;"></i>
+            <div style="margin-top:var(--space-3);color:var(--color-text-muted);">Loading announcements…</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sidebar -->
+      <aside>
+        <div class="announcement-sidebar-card">
+          <h3>Priority Guide</h3>
+          <div class="priority-legend-item">
+            <div class="priority-dot" style="background:var(--color-danger);"></div>
+            <div><strong>Urgent</strong> — Immediate action required. Route cancellations, safety notices.</div>
+          </div>
+          <div class="priority-legend-item">
+            <div class="priority-dot" style="background:var(--color-warning);"></div>
+            <div><strong>High</strong> — Important changes to schedules or routes.</div>
+          </div>
+          <div class="priority-legend-item">
+            <div class="priority-dot" style="background:var(--color-info);"></div>
+            <div><strong>Normal</strong> — General information and notices.</div>
+          </div>
+        </div>
+
+        <div class="announcement-sidebar-card">
+          <h3>Transport Office</h3>
+          <div style="display:flex;flex-direction:column;gap:var(--space-3);font-size:var(--font-size-sm);color:var(--color-text-muted);">
+            <div style="display:flex;align-items:center;gap:var(--space-2);">
+              <i data-lucide="phone" style="width:14px;height:14px;color:var(--color-primary);"></i>
+              +91 80 2345 6789
+            </div>
+            <div style="display:flex;align-items:center;gap:var(--space-2);">
+              <i data-lucide="mail" style="width:14px;height:14px;color:var(--color-primary);"></i>
+              transport@apex.edu.in
+            </div>
+            <div style="display:flex;align-items:center;gap:var(--space-2);">
+              <i data-lucide="clock" style="width:14px;height:14px;color:var(--color-primary);"></i>
+              Mon–Fri, 8 AM – 5 PM
+            </div>
+            <div style="display:flex;align-items:center;gap:var(--space-2);">
+              <i data-lucide="map-pin" style="width:14px;height:14px;color:var(--color-primary);"></i>
+              Administrative Block, Room 102
+            </div>
+          </div>
+        </div>
+
+        <div class="announcement-sidebar-card" id="recent-count-card">
+          <h3>Summary</h3>
+          <div id="announcements-summary" style="font-size:var(--font-size-sm);color:var(--color-text-muted);">Loading…</div>
+        </div>
+      </aside>
+
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-bottom">
+        <span>&copy; 2024 Apex Institute of Technology</span>
+        <span>Scheduled timings only. Not a live tracking service.</span>
+      </div>
+    </div>
+  </footer>
+
+  <div id="toast-container"></div>
+
+  <script type="module">
+    import { renderHeader } from '/js/navigation.js';
+    import { ApiClient } from '/js/api.js';
+    import { initIcons } from '/js/components/ui.js';
+
+    renderHeader();
+
+    let allAnnouncements = [];
+    let activeFilter = 'all';
+
+    async function loadAnnouncements() {
+      try {
+        const data = await ApiClient.getAnnouncements();
+        allAnnouncements = data?.data || [];
+        renderSummary();
+        renderFeed();
+      } catch (err) {
+        document.getElementById('announcements-feed').innerHTML =
+          `<div class="empty-state"><p style="color:var(--color-danger);">Could not load announcements. ${escHtml(err.message)}</p></div>`;
+        initIcons();
+      }
+    }
+
+    function renderFeed() {
+      const feed = document.getElementById('announcements-feed');
+      let items = allAnnouncements;
+      if (activeFilter !== 'all') items = items.filter(a => a.priority === activeFilter);
+
+      if (items.length === 0) {
+        feed.innerHTML = `<div class="empty-state" style="text-align:center;padding:var(--space-10);">
+          <i data-lucide="bell-off" style="width:36px;height:36px;color:var(--color-text-subtle);"></i>
+          <p style="color:var(--color-text-muted);margin-top:var(--space-3);">No ${activeFilter === 'all' ? '' : activeFilter + ' '}announcements at this time.</p>
+        </div>`;
+        initIcons();
+        return;
+      }
+
+      feed.innerHTML = items.map(a => `
+        <div class="announcement-card priority-${escHtml(a.priority || 'normal')}">
+          <div class="announcement-card-header">
+            <div class="announcement-title">${escHtml(a.title)}</div>
+            <span class="badge badge-${a.priority === 'urgent' ? 'danger' : a.priority === 'high' ? 'warning' : 'info'} flex-shrink-0">
+              ${escHtml(a.priority || 'normal')}
+            </span>
+          </div>
+          <div class="announcement-meta">
+            <span style="display:flex;align-items:center;gap:4px;">
+              <i data-lucide="calendar" style="width:12px;height:12px;"></i>
+              ${fmtDate(a.created_at)}
+            </span>
+            ${a.expires_at ? `
+            <span style="display:flex;align-items:center;gap:4px;">
+              <i data-lucide="clock" style="width:12px;height:12px;"></i>
+              Expires: ${fmtDate(a.expires_at)}
+            </span>` : ''}
+            ${a.created_by_name ? `
+            <span style="display:flex;align-items:center;gap:4px;">
+              <i data-lucide="user" style="width:12px;height:12px;"></i>
+              ${escHtml(a.created_by_name)}
+            </span>` : ''}
+          </div>
+          <div class="announcement-body">${escHtml(a.body || '')}</div>
+        </div>`).join('');
+      initIcons();
+    }
+
+    function renderSummary() {
+      const urgent = allAnnouncements.filter(a => a.priority === 'urgent').length;
+      const high = allAnnouncements.filter(a => a.priority === 'high').length;
+      const normal = allAnnouncements.filter(a => a.priority === 'normal').length;
+      document.getElementById('announcements-summary').innerHTML = `
+        <div style="display:flex;flex-direction:column;gap:var(--space-2);">
+          <div style="display:flex;justify-content:space-between;">
+            <span>Total notices:</span><strong>${allAnnouncements.length}</strong>
+          </div>
+          <div style="display:flex;justify-content:space-between;">
+            <span>Urgent:</span><strong style="color:var(--color-danger);">${urgent}</strong>
+          </div>
+          <div style="display:flex;justify-content:space-between;">
+            <span>High priority:</span><strong style="color:var(--color-warning);">${high}</strong>
+          </div>
+          <div style="display:flex;justify-content:space-between;">
+            <span>Normal:</span><strong>${normal}</strong>
+          </div>
+        </div>`;
+    }
+
+    // Filter chips
+    document.getElementById('filter-chips').addEventListener('click', (e) => {
+      const chip = e.target.closest('[data-filter]');
+      if (!chip) return;
+      document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      activeFilter = chip.dataset.filter;
+      renderFeed();
+    });
+
+    function fmtDate(iso) {
+      if (!iso) return '';
+      return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+    }
+
+    function escHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    loadAnnouncements();
+    initIcons();
+  </script>
+</body>
+</html>
+

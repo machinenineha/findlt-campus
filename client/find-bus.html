@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Find Your Bus — RouteReady Campus</title>
+  <meta name="description" content="Search for campus bus routes by origin and destination stop." />
+  <link rel="stylesheet" href="/css/base.css" />
+  <link rel="stylesheet" href="/css/layout.css" />
+  <link rel="stylesheet" href="/css/components.css" />
+  <link rel="stylesheet" href="/css/pages.css" />
+  <link rel="stylesheet" href="/css/responsive.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" defer></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
+  <style>
+    .find-bus-layout {
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      gap: 0;
+      min-height: calc(100vh - 4.25rem);
+    }
+    .find-bus-sidebar {
+      background: var(--color-surface);
+      border-right: 1px solid var(--color-border);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+    .find-bus-sidebar-header {
+      padding: var(--space-6);
+      border-bottom: 1px solid var(--color-border);
+      background: var(--color-primary);
+      color: white;
+    }
+    .find-bus-sidebar-header h1 {
+      font-size: var(--font-size-xl);
+      font-weight: 700;
+      margin-bottom: var(--space-1);
+    }
+    .find-bus-sidebar-header p {
+      font-size: var(--font-size-sm);
+      opacity: 0.85;
+    }
+    .find-bus-search-panel {
+      padding: var(--space-6);
+      border-bottom: 1px solid var(--color-border);
+    }
+    .find-bus-results {
+      padding: var(--space-4) var(--space-6);
+      flex: 1;
+    }
+    .find-bus-map {
+      position: sticky;
+      top: 4.25rem;
+      height: calc(100vh - 4.25rem);
+    }
+    #route-map {
+      width: 100%;
+      height: 100%;
+    }
+    .period-tabs {
+      display: flex;
+      gap: var(--space-1);
+      background: var(--color-surface-subtle);
+      border-radius: var(--radius-md);
+      padding: 3px;
+      margin-bottom: var(--space-4);
+    }
+    .period-tab {
+      flex: 1;
+      padding: var(--space-2);
+      border: none;
+      background: transparent;
+      border-radius: calc(var(--radius-md) - 2px);
+      font-size: var(--font-size-xs);
+      font-weight: 500;
+      color: var(--color-text-muted);
+      cursor: pointer;
+      transition: var(--transition);
+    }
+    .period-tab.active {
+      background: var(--color-surface);
+      color: var(--color-primary);
+      font-weight: 600;
+      box-shadow: var(--shadow-sm);
+    }
+    .result-card {
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      padding: var(--space-4);
+      margin-bottom: var(--space-3);
+      cursor: pointer;
+      transition: var(--transition);
+    }
+    .result-card:hover, .result-card.selected {
+      border-color: var(--color-primary);
+      box-shadow: var(--shadow-md);
+      background: var(--color-primary-soft);
+    }
+    .result-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: var(--space-2);
+    }
+    .result-route-name {
+      font-weight: 700;
+      color: var(--color-primary);
+      font-size: var(--font-size-base);
+    }
+    .result-bus-badge {
+      display: flex;
+      align-items: center;
+      gap: var(--space-1);
+      font-size: var(--font-size-xs);
+      color: var(--color-text-muted);
+      background: var(--color-surface-subtle);
+      padding: 2px 8px;
+      border-radius: var(--radius-full);
+    }
+    .result-path {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      font-size: var(--font-size-sm);
+      color: var(--color-text-muted);
+      margin-bottom: var(--space-3);
+      flex-wrap: wrap;
+    }
+    .result-path-stop {
+      font-weight: 500;
+      color: var(--color-text-main);
+    }
+    .result-times {
+      display: flex;
+      gap: var(--space-4);
+    }
+    .result-time-item {
+      display: flex;
+      flex-direction: column;
+    }
+    .result-time-label {
+      font-size: var(--font-size-xs);
+      color: var(--color-text-subtle);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .result-time-value {
+      font-size: var(--font-size-lg);
+      font-weight: 700;
+      color: var(--color-primary-dark);
+      font-variant-numeric: tabular-nums;
+    }
+    .stop-timeline {
+      padding: var(--space-3) 0;
+    }
+    .stop-timeline-item {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--space-3);
+      padding: var(--space-2) 0;
+      position: relative;
+    }
+    .stop-timeline-item:not(:last-child)::after {
+      content: '';
+      position: absolute;
+      left: 10px;
+      top: 26px;
+      bottom: 0;
+      width: 2px;
+      background: var(--color-border);
+    }
+    .stop-dot {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      border: 2px solid white;
+      box-shadow: 0 0 0 2px var(--color-border);
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 9px;
+      font-weight: 700;
+      color: white;
+      position: relative;
+      z-index: 1;
+    }
+    .stop-dot.start { background: var(--color-accent); box-shadow: 0 0 0 2px var(--color-accent); }
+    .stop-dot.end { background: var(--color-primary-dark); box-shadow: 0 0 0 2px var(--color-primary-dark); }
+    .stop-dot.mid { background: var(--color-primary); box-shadow: 0 0 0 2px var(--color-primary); }
+    .stop-info { flex: 1; }
+    .stop-name { font-size: var(--font-size-sm); font-weight: 500; color: var(--color-text-main); }
+    .stop-time { font-size: var(--font-size-xs); color: var(--color-text-subtle); font-variant-numeric: tabular-nums; }
+    .nearby-btn {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      font-size: var(--font-size-sm);
+      color: var(--color-primary);
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: var(--space-2) 0;
+    }
+    @media (max-width: 900px) {
+      .find-bus-layout { grid-template-columns: 1fr; }
+      .find-bus-map { position: relative; height: 280px; top: 0; }
+    }
+  </style>
+</head>
+<body>
+  <header class="site-header" id="site-header"></header>
+
+  <div class="find-bus-layout">
+    <!-- Sidebar: Search + Results -->
+    <aside class="find-bus-sidebar">
+      <div class="find-bus-sidebar-header">
+        <h1>
+          <i data-lucide="search" style="width:20px;height:20px;display:inline;vertical-align:text-bottom;"></i>
+          Find Your Bus
+        </h1>
+        <p>Search by stop name or area to find your route</p>
+      </div>
+
+      <div class="find-bus-search-panel">
+        <form id="search-form" novalidate>
+          <div class="form-group">
+            <label class="form-label" for="origin-input">
+              <i data-lucide="map-pin" style="width:13px;height:13px;color:var(--color-accent);"></i>
+              From (Origin Stop or Area)
+            </label>
+            <input type="text" id="origin-input" class="form-input" placeholder="e.g. Kengeri, Rajajinagar…" autocomplete="off" />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="dest-input">
+              <i data-lucide="flag" style="width:13px;height:13px;color:var(--color-primary);"></i>
+              To (Destination)
+            </label>
+            <input type="text" id="dest-input" class="form-input" placeholder="e.g. College Gate, Campus…" autocomplete="off" />
+          </div>
+          <div class="period-tabs" role="tablist">
+            <button type="button" class="period-tab active" data-period="morning" role="tab">🌅 Morning</button>
+            <button type="button" class="period-tab" data-period="evening" role="tab">🌇 Evening</button>
+            <button type="button" class="period-tab" data-period="all" role="tab">All</button>
+          </div>
+          <button type="submit" class="btn btn-primary btn-block">
+            <i data-lucide="search" style="width:15px;height:15px;"></i>
+            Search Routes
+          </button>
+        </form>
+        <div style="margin-top:var(--space-3);text-align:center;">
+          <button class="nearby-btn" id="nearby-btn" title="Find stops near your current location">
+            <i data-lucide="navigation" style="width:14px;height:14px;"></i>
+            Find stops near me
+          </button>
+        </div>
+      </div>
+
+      <div class="find-bus-results">
+        <div id="results-header" style="margin-bottom:var(--space-4);display:none;">
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <span class="text-sm text-muted" id="result-count-label"></span>
+            <button class="btn btn-outline btn-sm" id="clear-search-btn">Clear</button>
+          </div>
+        </div>
+        <div id="results-list">
+          <div class="empty-state" style="text-align:center;padding:var(--space-8) 0;">
+            <i data-lucide="bus" style="width:40px;height:40px;color:var(--color-text-subtle);margin-bottom:var(--space-3);"></i>
+            <p style="color:var(--color-text-muted);">Enter your origin and destination, then click Search to find available bus routes.</p>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Map Panel -->
+    <main class="find-bus-map" aria-label="Route map">
+      <div id="route-map"></div>
+    </main>
+  </div>
+
+  <div id="toast-container"></div>
+
+  <script type="module">
+    import { renderHeader } from '/js/navigation.js';
+    import { ApiClient } from '/js/api.js';
+    import { CampusMap } from '/js/map.js';
+    import { showToast, initIcons } from '/js/components/ui.js';
+
+    renderHeader();
+
+    const campusMap = new CampusMap('route-map');
+    campusMap.init();
+
+    let selectedPeriod = 'morning';
+    let selectedResultIndex = null;
+
+    // Period tab switching
+    document.querySelectorAll('.period-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.period-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        selectedPeriod = tab.dataset.period;
+      });
+    });
+
+    // Pre-fill from URL params
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('origin')) document.getElementById('origin-input').value = urlParams.get('origin');
+    if (urlParams.get('destination')) document.getElementById('dest-input').value = urlParams.get('destination');
+    if (urlParams.get('origin') || urlParams.get('destination')) {
+      setTimeout(() => document.getElementById('search-form').dispatchEvent(new Event('submit')), 200);
+    }
+
+    // Search form
+    document.getElementById('search-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const origin = document.getElementById('origin-input').value.trim();
+      const dest = document.getElementById('dest-input').value.trim();
+      if (!origin && !dest) {
+        showToast('Please enter at least an origin or destination.', 'warning');
+        return;
+      }
+      await runSearch(origin, dest, selectedPeriod);
+    });
+
+    // Clear
+    document.getElementById('clear-search-btn')?.addEventListener('click', () => {
+      document.getElementById('origin-input').value = '';
+      document.getElementById('dest-input').value = '';
+      document.getElementById('results-header').style.display = 'none';
+      document.getElementById('results-list').innerHTML = `
+        <div class="empty-state" style="text-align:center;padding:var(--space-8) 0;">
+          <i data-lucide="bus" style="width:40px;height:40px;color:var(--color-text-subtle);margin-bottom:var(--space-3);"></i>
+          <p style="color:var(--color-text-muted);">Enter your origin and destination, then click Search.</p>
+        </div>`;
+      campusMap.renderRouteStops([]);
+      initIcons();
+    });
+
+    // Nearby stops
+    document.getElementById('nearby-btn').addEventListener('click', () => {
+      if (!navigator.geolocation) { showToast('Geolocation is not supported by your browser.', 'warning'); return; }
+      showToast('Getting your location…', 'info');
+      navigator.geolocation.getCurrentPosition(async pos => {
+        const { latitude, longitude } = pos.coords;
+        try {
+          const data = await ApiClient.searchNearby(latitude, longitude, 10);
+          const stops = data?.data || [];
+          if (stops.length === 0) { showToast('No stops found within 10 km of your location.', 'info'); return; }
+          showNearbyResults(stops, latitude, longitude);
+        } catch { showToast('Could not load nearby stops.', 'error'); }
+      }, () => showToast('Could not get your location. Please allow location access.', 'error'));
+    });
+
+    async function runSearch(origin, dest, period) {
+      const listEl = document.getElementById('results-list');
+      listEl.innerHTML = `<div class="loading-state" style="text-align:center;padding:var(--space-8) 0;">
+        <i data-lucide="loader-circle" class="spin" style="width:24px;height:24px;"></i><br/>Searching routes…</div>`;
+      document.getElementById('results-header').style.display = '';
+      initIcons();
+      try {
+        const data = await ApiClient.searchOriginDestination(origin || '', dest || '', period);
+        const results = data?.data || [];
+        document.getElementById('result-count-label').textContent =
+          results.length === 0 ? 'No routes found' : `${results.length} route${results.length > 1 ? 's' : ''} found`;
+        if (results.length === 0) {
+          listEl.innerHTML = `<div class="empty-state" style="text-align:center;padding:var(--space-8) 0;">
+            <i data-lucide="search-x" style="width:36px;height:36px;color:var(--color-text-subtle);margin-bottom:var(--space-3);"></i>
+            <p style="color:var(--color-text-muted);">No bus route found for this combination.<br />Try a different stop name or area.</p></div>`;
+          initIcons();
+          return;
+        }
+        renderResults(results);
+        // Auto-select first
+        if (results[0]?.stops?.length) campusMap.renderRouteStops(results[0].stops);
+      } catch (err) {
+        listEl.innerHTML = `<div class="empty-state" style="text-align:center;padding:var(--space-8) 0;">
+          <p style="color:var(--color-danger);">Search failed: ${escHtml(err.message)}. Please try again.</p></div>`;
+        initIcons();
+      }
+    }
+
+    function renderResults(results) {
+      const listEl = document.getElementById('results-list');
+      listEl.innerHTML = results.map((r, i) => `
+        <div class="result-card ${i === 0 ? 'selected' : ''}" data-index="${i}" tabindex="0" role="button" aria-label="Route ${escHtml(r.route_name)}">
+          <div class="result-card-header">
+            <div class="result-route-name">${escHtml(r.route_name || r.name || 'Route')}</div>
+            <div class="result-bus-badge">
+              <i data-lucide="bus-front" style="width:11px;height:11px;"></i>
+              ${escHtml(r.bus_number || r.plate_number || '')}
+            </div>
+          </div>
+          <div class="result-path">
+            <span class="result-path-stop">${escHtml(r.stops?.[0]?.name || r.origin || 'Origin')}</span>
+            <i data-lucide="arrow-right" style="width:13px;height:13px;"></i>
+            <span class="result-path-stop">${escHtml(r.stops?.[r.stops?.length - 1]?.name || r.destination || 'Destination')}</span>
+          </div>
+          ${r.schedules?.length ? `
+          <div class="result-times">
+            ${r.schedules.slice(0, 2).map(s => `
+              <div class="result-time-item">
+                <span class="result-time-label">${escHtml(s.service_period || 'Departure')}</span>
+                <span class="result-time-value">${fmtTime(s.departure_time)}</span>
+              </div>`).join('')}
+          </div>` : ''}
+          ${r.stops?.length ? `
+          <details style="margin-top:var(--space-3);">
+            <summary style="font-size:var(--font-size-xs);color:var(--color-primary);cursor:pointer;">
+              ${r.stops.length} stops on this route
+            </summary>
+            <div class="stop-timeline" style="margin-top:var(--space-2);">
+              ${r.stops.map((s, si) => `
+                <div class="stop-timeline-item">
+                  <div class="stop-dot ${si === 0 ? 'start' : si === r.stops.length - 1 ? 'end' : 'mid'}">${si + 1}</div>
+                  <div class="stop-info">
+                    <div class="stop-name">${escHtml(s.name)}</div>
+                    ${s.scheduled_time ? `<div class="stop-time">${fmtTime(s.scheduled_time)}</div>` : ''}
+                  </div>
+                </div>`).join('')}
+            </div>
+          </details>` : ''}
+          <div style="margin-top:var(--space-3);">
+            <a href="/route-detail.html?id=${encodeURIComponent(r.id || r.route_id || '')}" class="btn btn-outline btn-sm" style="width:100%;">
+              <i data-lucide="map" style="width:13px;height:13px;"></i>
+              View Full Route
+            </a>
+          </div>
+        </div>`).join('');
+      initIcons();
+
+      // Card click to show on map
+      listEl.querySelectorAll('.result-card').forEach((card, i) => {
+        card.addEventListener('click', () => {
+          listEl.querySelectorAll('.result-card').forEach(c => c.classList.remove('selected'));
+          card.classList.add('selected');
+          if (results[i]?.stops?.length) campusMap.renderRouteStops(results[i].stops);
+        });
+        card.addEventListener('keypress', e => { if (e.key === 'Enter') card.click(); });
+      });
+    }
+
+    function showNearbyResults(stops, lat, lon) {
+      document.getElementById('results-header').style.display = '';
+      document.getElementById('result-count-label').textContent = `${stops.length} stops near you`;
+      campusMap.renderRouteStops(stops.map(s => ({ ...s, latitude: s.latitude || s.lat, longitude: s.longitude || s.lon })));
+      const listEl = document.getElementById('results-list');
+      listEl.innerHTML = stops.map(s => `
+        <div class="result-card">
+          <div class="result-card-header">
+            <div class="result-route-name" style="font-size:var(--font-size-sm);">${escHtml(s.name)}</div>
+            ${s.distance_km ? `<span class="badge badge-info">${s.distance_km.toFixed(1)} km</span>` : ''}
+          </div>
+          ${s.locality ? `<div class="text-muted text-sm">${escHtml(s.locality)}</div>` : ''}
+        </div>`).join('');
+      initIcons();
+    }
+
+    function fmtTime(t) {
+      if (!t) return '—';
+      const parts = t.split(':');
+      let h = parseInt(parts[0], 10);
+      const m = parts[1] || '00';
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      h = h % 12 || 12;
+      return `${h}:${m} ${ampm}`;
+    }
+
+    function escHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    initIcons();
+  </script>
+</body>
+</html>
+
